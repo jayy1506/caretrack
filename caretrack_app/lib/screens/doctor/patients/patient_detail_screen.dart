@@ -1,6 +1,9 @@
+import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../services/auth_service.dart';
+import '../../../models/user_model.dart';
 import '../../../models/patient_model.dart';
 import '../../../models/prescription_model.dart';
 import '../../../models/appointment_model.dart';
@@ -37,10 +40,12 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> with SingleTi
   final _notificationService = NotificationTrackingService();
   final _timelineService = TimelineService();
   final _commsService = CommsSenderService();
+  late PatientModel _patient;
 
   @override
   void initState() {
     super.initState();
+    _patient = widget.patient;
     _tabController = TabController(length: 5, vsync: this);
   }
 
@@ -53,11 +58,12 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> with SingleTi
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthService>(context);
-    final isViewOnly = auth.currentUser?.isViewOnly == true;
+    final user = auth.currentUser;
+    final isViewOnly = user?.isViewOnly == true;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.patient.name),
+        title: Text(_patient.name),
         actions: [
           if (isViewOnly)
             Container(
@@ -135,7 +141,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> with SingleTi
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildOverviewTab(),
+          _buildOverviewTab(user),
           _buildPrescriptionsTab(),
           _buildAppointmentsTab(),
           _buildTimelineTab(),
@@ -146,7 +152,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> with SingleTi
   }
 
   // --- TAB 1: OVERVIEW ---
-  Widget _buildOverviewTab() {
+  Widget _buildOverviewTab(UserModel? user) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -163,24 +169,24 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> with SingleTi
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        widget.patient.name,
+                        _patient.name,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.slateDark,
                         ),
                       ),
-                      StatusBadge(status: widget.patient.status.toUpperCase()),
+                      StatusBadge(status: _patient.status.toUpperCase()),
                     ],
                   ),
                   const SizedBox(height: 12),
                   const Divider(),
                   const SizedBox(height: 12),
-                  _buildDetailRow('Age / DOB', '${widget.patient.age ?? "—"} yrs • ${widget.patient.dateOfBirth ?? "Not set"}'),
-                  _buildDetailRow('Mobile Phone', widget.patient.phone ?? 'Not specified'),
-                  _buildDetailRow('Email Address', widget.patient.email ?? 'Not specified'),
-                  _buildDetailRow('Address', widget.patient.address ?? 'Not specified'),
-                  _buildDetailRow('Registered On', DateUtilsHelper.formatDisplayDate(widget.patient.createdAt)),
+                  _buildDetailRow('Age / DOB', '${_patient.age ?? "—"} yrs • ${_patient.dateOfBirth ?? "Not set"}'),
+                  _buildDetailRow('Mobile Phone', _patient.phone ?? 'Not specified'),
+                  _buildDetailRow('Email Address', _patient.email ?? 'Not specified'),
+                  _buildDetailRow('Address', _patient.address ?? 'Not specified'),
+                  _buildDetailRow('Registered On', DateUtilsHelper.formatDisplayDate(_patient.createdAt)),
                   const SizedBox(height: 14),
                   const Divider(),
                   const SizedBox(height: 10),
@@ -188,17 +194,17 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> with SingleTi
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      if (widget.patient.phone != null && widget.patient.phone!.isNotEmpty) ...[
+                      if (_patient.phone != null && _patient.phone!.isNotEmpty) ...[
                         OutlinedButton.icon(
                           onPressed: () => _commsService.openMessageComposerDialog(
                             context: context,
-                            doctorId: widget.patient.doctorId,
-                            patientId: widget.patient.id,
-                            patientName: widget.patient.name,
-                            initialPhone: widget.patient.phone,
-                            initialEmail: widget.patient.email,
+                            doctorId: _patient.doctorId,
+                            patientId: _patient.id,
+                            patientName: _patient.name,
+                            initialPhone: _patient.phone,
+                            initialEmail: _patient.email,
                             initialChannel: 'sms',
-                            defaultMessage: 'Hello ${widget.patient.name}, this is CareTrack Dental Clinic regarding your treatment follow-up and next routine checkup.',
+                            defaultMessage: 'Hello ${_patient.name}, this is CareTrack Dental Clinic regarding your treatment follow-up and next routine checkup.',
                           ),
                           icon: const Icon(Icons.sms_outlined, size: 16, color: AppTheme.primaryBlue),
                           label: const Text('Send SMS'),
@@ -206,30 +212,30 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> with SingleTi
                         OutlinedButton.icon(
                           onPressed: () => _commsService.openMessageComposerDialog(
                             context: context,
-                            doctorId: widget.patient.doctorId,
-                            patientId: widget.patient.id,
-                            patientName: widget.patient.name,
-                            initialPhone: widget.patient.phone,
-                            initialEmail: widget.patient.email,
+                            doctorId: _patient.doctorId,
+                            patientId: _patient.id,
+                            patientName: _patient.name,
+                            initialPhone: _patient.phone,
+                            initialEmail: _patient.email,
                             initialChannel: 'whatsapp',
-                            defaultMessage: 'Hello ${widget.patient.name}, this is CareTrack Dental Clinic regarding your treatment follow-up and next routine checkup.',
+                            defaultMessage: 'Hello ${_patient.name}, this is CareTrack Dental Clinic regarding your treatment follow-up and next routine checkup.',
                           ),
                           icon: const Icon(Icons.chat_bubble_outline, size: 16, color: Color(0xFF10B981)),
                           label: const Text('WhatsApp'),
                         ),
                       ],
-                      if (widget.patient.email != null && widget.patient.email!.isNotEmpty)
+                      if (_patient.email != null && _patient.email!.isNotEmpty)
                         OutlinedButton.icon(
                           onPressed: () => _commsService.openMessageComposerDialog(
                             context: context,
-                            doctorId: widget.patient.doctorId,
-                            patientId: widget.patient.id,
-                            patientName: widget.patient.name,
-                            initialPhone: widget.patient.phone,
-                            initialEmail: widget.patient.email,
+                            doctorId: _patient.doctorId,
+                            patientId: _patient.id,
+                            patientName: _patient.name,
+                            initialPhone: _patient.phone,
+                            initialEmail: _patient.email,
                             initialChannel: 'email',
                             defaultSubject: 'CareTrack Dental Clinic Care Update',
-                            defaultMessage: 'Dear ${widget.patient.name},\n\nYour clinical profile is active in CareTrack. Please let us know if you have any questions.\n\nBest regards,\nCareTrack Team',
+                            defaultMessage: 'Dear ${_patient.name},\n\nYour clinical profile is active in CareTrack. Please let us know if you have any questions.\n\nBest regards,\nCareTrack Team',
                           ),
                           icon: const Icon(Icons.email_outlined, size: 16, color: Color(0xFF6366F1)),
                           label: const Text('Send Email'),
@@ -240,6 +246,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> with SingleTi
               ),
             ),
           ),
+          const SizedBox(height: 16),
+
+          // DPDP Consent Status Card
+          _buildConsentCard(user),
+          const SizedBox(height: 16),
+
+          // Owner Compliance & Data Rights (Export / Erase)
+          _buildDataRightsCard(user),
           const SizedBox(height: 16),
 
           // Routine Checkup Quick Recall Card (1, 2, or 3 Months)
@@ -274,7 +288,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> with SingleTi
                             style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
                           ),
                           Text(
-                            '1-Tap schedule & auto-dispatch Twilio SMS + Email to patient',
+                            '1-Tap schedule & auto-dispatch WhatsApp + SMS + Email to patient',
                             style: TextStyle(fontSize: 11, color: Color(0xFF166534)),
                           ),
                         ],
@@ -446,6 +460,566 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> with SingleTi
         ],
       ),
     );
+  }
+
+  Widget _buildConsentCard(UserModel? user) {
+    final consent = _patient.consentRecord;
+    final msgActive = consent.messagingConsent;
+    final aiActive = consent.aiProcessingConsent;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.borderSubtle),
+        boxShadow: AppTheme.softShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryLight,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.verified_user_outlined, color: AppTheme.primaryNavy, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'DPDP Consent Status',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.slateDark),
+                      ),
+                      Text(
+                        'Digital Personal Data Protection Act (India)',
+                        style: TextStyle(fontSize: 11, color: AppTheme.slateMuted),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              if (user?.canEdit == true)
+                TextButton.icon(
+                  onPressed: _openConsentDialog,
+                  icon: const Icon(Icons.edit_note, size: 16),
+                  label: const Text('Update', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: msgActive ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: msgActive ? const Color(0xFFBBF7D0) : const Color(0xFFFECACA)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            msgActive ? Icons.check_circle : Icons.cancel,
+                            size: 16,
+                            color: msgActive ? const Color(0xFF16A34A) : AppTheme.statusDanger,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Messaging',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: msgActive ? const Color(0xFF166534) : const Color(0xFF991B1B),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        msgActive ? 'Consented (${consent.messagingConsentMethod.replaceAll('_', ' ')})' : 'Opted Out',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: msgActive ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: aiActive ? const Color(0xFFF5F3FF) : const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: aiActive ? const Color(0xFFDDD6FE) : const Color(0xFFFECACA)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            aiActive ? Icons.smart_toy_outlined : Icons.cancel,
+                            size: 16,
+                            color: aiActive ? const Color(0xFF7C3AED) : AppTheme.statusDanger,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'AI Processing',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: aiActive ? const Color(0xFF5B21B6) : const Color(0xFF991B1B),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        aiActive ? 'Consented (${consent.aiProcessingConsentMethod.replaceAll('_', ' ')})' : 'Opted Out',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: aiActive ? const Color(0xFF6D28D9) : const Color(0xFFB91C1C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDataRightsCard(UserModel? user) {
+    if (user?.isOwner != true) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.borderSubtle),
+        boxShadow: AppTheme.softShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.privacy_tip_outlined, color: Color(0xFFD97706), size: 18),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Patient Data Rights (Owner Only)',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.slateDark),
+                    ),
+                    Text(
+                      'DPDP Act 2023: Right to Access and Right to Erasure',
+                      style: TextStyle(fontSize: 11, color: AppTheme.slateMuted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: const BorderSide(color: AppTheme.primaryNavy),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: _exportHealthRecords,
+                  icon: const Icon(Icons.download_outlined, size: 16, color: AppTheme.primaryNavy),
+                  label: const Text(
+                    'Export JSON',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.primaryNavy),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: const BorderSide(color: AppTheme.statusDanger),
+                    foregroundColor: AppTheme.statusDanger,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: _confirmErasePatientData,
+                  icon: const Icon(Icons.delete_forever_outlined, size: 16),
+                  label: const Text(
+                    'Erase Data (DPDP)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openConsentDialog() async {
+    bool msgConsent = _patient.consentRecord.messagingConsent;
+    String msgMethod = _patient.consentRecord.messagingConsentMethod;
+    bool aiConsent = _patient.consentRecord.aiProcessingConsent;
+    String aiMethod = _patient.consentRecord.aiProcessingConsentMethod;
+    final notesCtrl = TextEditingController(text: _patient.consentRecord.consentNotes ?? '');
+
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('Update DPDP Consent'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Record explicit consent from the patient as required by the Digital Personal Data Protection Act 2023.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.slateMuted),
+                    ),
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('WhatsApp & SMS Messaging', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      subtitle: const Text('Send appointment reminders and treatment updates', style: TextStyle(fontSize: 11)),
+                      value: msgConsent,
+                      onChanged: (val) => setDialogState(() => msgConsent = val),
+                    ),
+                    if (msgConsent) ...[
+                      const SizedBox(height: 4),
+                      DropdownButtonFormField<String>(
+                        initialValue: msgMethod,
+                        decoration: const InputDecoration(
+                          labelText: 'Messaging Consent Method',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'in_person', child: Text('In-Person Verbal / Clinic Visit')),
+                          DropdownMenuItem(value: 'whatsapp_opt_in', child: Text('WhatsApp Opt-In Message')),
+                          DropdownMenuItem(value: 'web_booking', child: Text('Online Slot Booking Form')),
+                          DropdownMenuItem(value: 'paper_form', child: Text('Physical Intake Paper Form')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => msgMethod = val);
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('AI Prescription & Care Analysis', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      subtitle: const Text('Allow AI models to parse prescriptions & suggest recalls', style: TextStyle(fontSize: 11)),
+                      value: aiConsent,
+                      onChanged: (val) => setDialogState(() => aiConsent = val),
+                    ),
+                    if (aiConsent) ...[
+                      const SizedBox(height: 4),
+                      DropdownButtonFormField<String>(
+                        initialValue: aiMethod,
+                        decoration: const InputDecoration(
+                          labelText: 'AI Consent Method',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'in_person', child: Text('In-Person Verbal / Clinic Visit')),
+                          DropdownMenuItem(value: 'web_booking', child: Text('Online Booking Intake Form')),
+                          DropdownMenuItem(value: 'paper_form', child: Text('Physical Intake Paper Form')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => aiMethod = val);
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: notesCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Consent Audit Notes (Optional)',
+                        hintText: 'e.g. Signed on paper form during consultation',
+                      ),
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Save Consent'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (updated == true) {
+      try {
+        await _patientService.updateConsent(
+          patientId: _patient.id,
+          clinicId: _patient.clinicId,
+          messagingConsent: msgConsent,
+          messagingConsentMethod: msgMethod,
+          aiProcessingConsent: aiConsent,
+          aiProcessingConsentMethod: aiMethod,
+          consentNotes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+        );
+
+        final newRecord = PatientConsentRecord(
+          messagingConsent: msgConsent,
+          messagingConsentMethod: msgMethod,
+          messagingConsentTimestamp: DateTime.now(),
+          aiProcessingConsent: aiConsent,
+          aiProcessingConsentMethod: aiMethod,
+          aiProcessingConsentTimestamp: DateTime.now(),
+          consentNotes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+        );
+
+        setState(() {
+          _patient = PatientModel(
+            id: _patient.id,
+            clinicId: _patient.clinicId,
+            doctorId: _patient.doctorId,
+            name: _patient.name,
+            age: _patient.age,
+            dateOfBirth: _patient.dateOfBirth,
+            phone: _patient.phone,
+            email: _patient.email,
+            address: _patient.address,
+            status: _patient.status,
+            allergies: _patient.allergies,
+            preferredReminderHour: _patient.preferredReminderHour,
+            messagingConsent: msgConsent,
+            aiProcessingConsent: aiConsent,
+            consentRecord: newRecord,
+            createdAt: _patient.createdAt,
+            updatedAt: DateTime.now(),
+          );
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Patient DPDP consent updated and logged to audit trail.'),
+              backgroundColor: Color(0xFF10B981),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update consent: $e'),
+              backgroundColor: AppTheme.statusDanger,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _exportHealthRecords() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final data = await _patientService.exportPatientData(
+        patientId: _patient.id,
+        clinicId: _patient.clinicId,
+      );
+
+      if (mounted) Navigator.pop(context); // close loader
+      if (!mounted) return;
+
+      final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
+
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Export Health Records (JSON)'),
+          content: SizedBox(
+            width: 500,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Complete structured health record export in accordance with DPDP Act 2023 data portability rights.',
+                  style: TextStyle(fontSize: 12, color: AppTheme.slateMuted),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  height: 250,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.borderSubtle),
+                  ),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      jsonStr,
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+            FilledButton.icon(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: jsonStr));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Health records JSON copied to clipboard!')),
+                );
+              },
+              icon: const Icon(Icons.copy, size: 16),
+              label: const Text('Copy JSON'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export error: $e'), backgroundColor: AppTheme.statusDanger),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmErasePatientData() async {
+    final reasonCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppTheme.statusDanger),
+            SizedBox(width: 8),
+            Text('Erase Patient Data (DPDP)'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Under DPDP Act 2023 Right to Erasure, this operation will permanently anonymize clinical records, delete prescription scans from storage, and record a sanitized audit event.',
+              style: TextStyle(fontSize: 13, color: AppTheme.slateDark),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Clinical / Legal Reason for Erasure *',
+                hintText: 'e.g. Patient explicit withdrawal of consent',
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.statusDanger),
+            onPressed: () {
+              if (reasonCtrl.text.trim().isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Reason for erasure is required.')),
+                );
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Confirm Permanent Erasure'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(child: CircularProgressIndicator()),
+        );
+
+        await _patientService.erasePatientData(
+          patientId: _patient.id,
+          reason: reasonCtrl.text.trim(),
+          clinicId: _patient.clinicId,
+        );
+
+        if (mounted) Navigator.pop(context); // close loader
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Patient records permanently erased under DPDP Act.'),
+              backgroundColor: AppTheme.slateDark,
+            ),
+          );
+          Navigator.pop(context); // leave patient detail
+        }
+      } catch (e) {
+        if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erasure error: $e'), backgroundColor: AppTheme.statusDanger),
+          );
+        }
+      }
+    }
   }
 
   // --- TAB 2: PRESCRIPTIONS ---

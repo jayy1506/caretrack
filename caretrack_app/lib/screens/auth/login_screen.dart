@@ -186,7 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 10),
                     _buildFeatureItem(Icons.auto_awesome, 'AI Prescription Recall', 'Auto-calculates standard +3m follow-up intervals'),
                     const SizedBox(height: 10),
-                    _buildFeatureItem(Icons.mark_email_read_outlined, 'Twilio SMS & Email', 'Automated reminders sent directly to patient phones & inbox'),
+                    _buildFeatureItem(Icons.mark_email_read_outlined, 'WhatsApp & Smart Reminders', 'Automated reminders sent directly to patient phones & inbox'),
                   ],
                 ),
               ),

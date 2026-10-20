@@ -200,4 +200,56 @@ class PatientService {
     OfflineStore().deletePatient(patientId);
     _firestore.collection('patients').doc(patientId).delete().catchError((_) {});
   }
+
+  /// Update patient DPDP consent flags with verified audit trail
+  Future<void> updateConsent({
+    required String patientId,
+    required bool messagingConsent,
+    required String messagingConsentMethod,
+    required bool aiProcessingConsent,
+    required String aiProcessingConsentMethod,
+    String? consentNotes,
+    String? clinicId,
+  }) async {
+    final callable = _functions.httpsCallable('updatePatientConsent');
+    await callable.call({
+      'patientId': patientId,
+      if (clinicId != null) 'clinicId': clinicId,
+      'messagingConsent': messagingConsent,
+      'messagingConsentMethod': messagingConsentMethod,
+      'aiProcessingConsent': aiProcessingConsent,
+      'aiProcessingConsentMethod': aiProcessingConsentMethod,
+      if (consentNotes != null) 'consentNotes': consentNotes,
+    });
+    _patientCache.remove(patientId);
+  }
+
+  /// Export patient data as structured JSON (Owner only)
+  Future<Map<String, dynamic>> exportPatientData({
+    required String patientId,
+    String? clinicId,
+  }) async {
+    final callable = _functions.httpsCallable('exportPatientData');
+    final res = await callable.call({
+      'patientId': patientId,
+      if (clinicId != null) 'clinicId': clinicId,
+    });
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  /// Erase patient data permanently under DPDP Act (Owner only)
+  Future<void> erasePatientData({
+    required String patientId,
+    required String reason,
+    String? clinicId,
+  }) async {
+    final callable = _functions.httpsCallable('erasePatientData');
+    await callable.call({
+      'patientId': patientId,
+      'reason': reason,
+      if (clinicId != null) 'clinicId': clinicId,
+    });
+    _patientCache.remove(patientId);
+    OfflineStore().deletePatient(patientId);
+  }
 }

@@ -7,6 +7,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/custom_button.dart';
 import 'demo_settings_screen.dart';
+import '../../compliance/privacy_policy_screen.dart';
+import '../../compliance/terms_of_service_screen.dart';
+import '../../compliance/feedback_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -216,6 +219,58 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const DemoSettingsScreen()),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Compliance & Legal Section
+          const Text(
+            'Compliance, Legal & Feedback',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.primaryNavy),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.borderGrey),
+              boxShadow: AppTheme.softShadow,
+            ),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.privacy_tip_outlined, color: AppTheme.primaryTeal),
+                  title: const Text('Privacy Policy & DPDP Act Data Handling', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  subtitle: const Text('Digital Personal Data Protection Act compliance summary', style: TextStyle(fontSize: 12)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.description_outlined, color: AppTheme.primaryNavy),
+                  title: const Text('Terms of Service & Clinical Care', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  subtitle: const Text('Clinical discretion, doctor responsibilities & emergency disclaimer', style: TextStyle(fontSize: 12)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TermsOfServiceScreen()),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.feedback_outlined, color: Color(0xFF6366F1)),
+                  title: const Text('Submit Pilot Feedback', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  subtitle: const Text('Report observations and workflow feedback for the pilot report', style: TextStyle(fontSize: 12)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const FeedbackScreen()),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 28),

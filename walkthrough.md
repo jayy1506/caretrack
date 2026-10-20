@@ -114,7 +114,7 @@ dental/
 5. **Patient Confirmation & No-Response Tracking (Features 3, 4, 5):**
    - Public HTTPS endpoint for 1-click confirmation / reschedule request.
    - Real-time status badges (*Confirmed*, *Pending*, *Reschedule Requested*, *Missed*).
-   - One-tap reminder resend.
+   - One-tap reminder re-dispatch.
 
 6. **Communication History (Feature 6):**
    - Every email, SMS, and push attempt is logged in `notifications/{id}` with exact delivery statuses and error descriptions.

@@ -1,3 +1,59 @@
+class PatientConsentRecord {
+  final bool messagingConsent;
+  final String messagingConsentMethod; // 'in_person' | 'whatsapp_opt_in' | 'web_booking' | 'paper_form'
+  final DateTime? messagingConsentTimestamp;
+  final bool aiProcessingConsent;
+  final String aiProcessingConsentMethod; // 'in_person' | 'web_booking' | 'paper_form'
+  final DateTime? aiProcessingConsentTimestamp;
+  final String? consentNotes;
+
+  PatientConsentRecord({
+    this.messagingConsent = true,
+    this.messagingConsentMethod = 'in_person',
+    this.messagingConsentTimestamp,
+    this.aiProcessingConsent = true,
+    this.aiProcessingConsentMethod = 'in_person',
+    this.aiProcessingConsentTimestamp,
+    this.consentNotes,
+  });
+
+  factory PatientConsentRecord.fromMap(Map<String, dynamic>? map) {
+    if (map == null) return PatientConsentRecord();
+    DateTime? parseD(dynamic val) {
+      if (val == null) return null;
+      if (val is DateTime) return val;
+      if (val is String) return DateTime.tryParse(val);
+      try {
+        return val.toDate();
+      } catch (_) {
+        return null;
+      }
+    }
+
+    return PatientConsentRecord(
+      messagingConsent: map['messagingConsent'] ?? true,
+      messagingConsentMethod: map['messagingConsentMethod'] ?? 'in_person',
+      messagingConsentTimestamp: parseD(map['messagingConsentTimestamp']),
+      aiProcessingConsent: map['aiProcessingConsent'] ?? true,
+      aiProcessingConsentMethod: map['aiProcessingConsentMethod'] ?? 'in_person',
+      aiProcessingConsentTimestamp: parseD(map['aiProcessingConsentTimestamp']),
+      consentNotes: map['consentNotes'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'messagingConsent': messagingConsent,
+      'messagingConsentMethod': messagingConsentMethod,
+      'messagingConsentTimestamp': messagingConsentTimestamp?.toIso8601String(),
+      'aiProcessingConsent': aiProcessingConsent,
+      'aiProcessingConsentMethod': aiProcessingConsentMethod,
+      'aiProcessingConsentTimestamp': aiProcessingConsentTimestamp?.toIso8601String(),
+      if (consentNotes != null) 'consentNotes': consentNotes,
+    };
+  }
+}
+
 class PatientModel {
   final String id;
   final String clinicId;
@@ -11,6 +67,9 @@ class PatientModel {
   final String status; // 'active' | 'archived'
   final List<String> allergies;
   final int? preferredReminderHour;
+  final bool messagingConsent;
+  final bool aiProcessingConsent;
+  final PatientConsentRecord consentRecord;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -27,9 +86,17 @@ class PatientModel {
     this.status = 'active',
     this.allergies = const [],
     this.preferredReminderHour,
+    this.messagingConsent = true,
+    this.aiProcessingConsent = true,
+    PatientConsentRecord? consentRecord,
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.now(),
+  })  : consentRecord = consentRecord ??
+            PatientConsentRecord(
+              messagingConsent: messagingConsent,
+              aiProcessingConsent: aiProcessingConsent,
+            ),
+        createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
   factory PatientModel.fromMap(Map<String, dynamic> map, String id) {
@@ -40,12 +107,15 @@ class PatientModel {
         return DateTime.tryParse(val) ?? DateTime.now();
       }
       try {
-        // Firebase Timestamp
         return val.toDate();
       } catch (_) {
         return DateTime.now();
       }
     }
+
+    final consentObj = map['consentRecord'] as Map<String, dynamic>?;
+    final msgConsent = map['messagingConsent'] ?? consentObj?['messagingConsent'] ?? true;
+    final aiConsent = map['aiProcessingConsent'] ?? consentObj?['aiProcessingConsent'] ?? true;
 
     return PatientModel(
       id: id,
@@ -62,6 +132,9 @@ class PatientModel {
       preferredReminderHour: map['preferredReminderHour'] != null
           ? int.tryParse(map['preferredReminderHour'].toString())
           : null,
+      messagingConsent: msgConsent,
+      aiProcessingConsent: aiConsent,
+      consentRecord: PatientConsentRecord.fromMap(consentObj),
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
     );
@@ -81,6 +154,9 @@ class PatientModel {
       'status': status,
       'allergies': allergies,
       'preferredReminderHour': preferredReminderHour,
+      'messagingConsent': messagingConsent,
+      'aiProcessingConsent': aiProcessingConsent,
+      'consentRecord': consentRecord.toMap(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -99,6 +175,9 @@ class PatientModel {
     String? status,
     List<String>? allergies,
     int? preferredReminderHour,
+    bool? messagingConsent,
+    bool? aiProcessingConsent,
+    PatientConsentRecord? consentRecord,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -115,6 +194,9 @@ class PatientModel {
       status: status ?? this.status,
       allergies: allergies ?? this.allergies,
       preferredReminderHour: preferredReminderHour ?? this.preferredReminderHour,
+      messagingConsent: messagingConsent ?? this.messagingConsent,
+      aiProcessingConsent: aiProcessingConsent ?? this.aiProcessingConsent,
+      consentRecord: consentRecord ?? this.consentRecord,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
