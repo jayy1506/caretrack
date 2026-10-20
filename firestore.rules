@@ -1,0 +1,134 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Auth and claim helpers
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function userRole() {
+      return request.auth.token.role;
+    }
+    
+    function userClinicId() {
+      return request.auth.token.clinicId;
+    }
+    
+    function isGlobalAdmin() {
+      return isAuthenticated() && (userRole() == 'admin');
+    }
+    
+    function isOwner(clinicId) {
+      return isAuthenticated() && 
+        ((userRole() == 'owner' && userClinicId() == clinicId) || isGlobalAdmin());
+    }
+    
+    function isDoctor(clinicId) {
+      return isAuthenticated() && 
+        (userRole() == 'doctor' && userClinicId() == clinicId);
+    }
+    
+    function isReceptionist(clinicId) {
+      return isAuthenticated() && 
+        (userRole() == 'receptionist' && userClinicId() == clinicId);
+    }
+    
+    function isStaff(clinicId) {
+      return isOwner(clinicId) || isDoctor(clinicId) || isReceptionist(clinicId);
+    }
+
+    // Clinics collection
+    match /clinics/{clinicId} {
+      allow read: if isStaff(clinicId);
+      allow write: if isOwner(clinicId);
+    }
+
+    // Users collection: Profile access & prevention of role escalation
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isOwner(resource.data.clinicId));
+      allow write: if isGlobalAdmin();
+      // Users can update their own non-sensitive profile fields only
+      allow update: if isAuthenticated() && request.auth.uid == userId 
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'clinicId', 'active']));
+    }
+
+    // Patients collection: Scoped by clinicId
+    match /patients/{patientId} {
+      allow read: if isAuthenticated() && (
+        (isDoctor(resource.data.clinicId) && resource.data.doctorId == request.auth.uid) ||
+        isReceptionist(resource.data.clinicId) ||
+        isOwner(resource.data.clinicId)
+      );
+      allow create: if isAuthenticated() && isStaff(request.resource.data.clinicId);
+      allow update: if isAuthenticated() && (
+        (isDoctor(resource.data.clinicId) && resource.data.doctorId == request.auth.uid) ||
+        isReceptionist(resource.data.clinicId) ||
+        isOwner(resource.data.clinicId)
+      );
+      allow delete: if isAuthenticated() && isOwner(resource.data.clinicId);
+    }
+
+    // Prescriptions collection: Clinical notes protected from receptionists
+    match /prescriptions/{prescriptionId} {
+      allow read: if isAuthenticated() && (
+        (isDoctor(resource.data.clinicId) && resource.data.doctorId == request.auth.uid) ||
+        isOwner(resource.data.clinicId)
+      );
+      allow create: if isAuthenticated() && isDoctor(request.resource.data.clinicId) && request.resource.data.doctorId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && isDoctor(resource.data.clinicId) && resource.data.doctorId == request.auth.uid;
+    }
+
+    // Appointments collection: Scoped by clinicId
+    match /appointments/{appointmentId} {
+      allow read: if isAuthenticated() && (
+        (isDoctor(resource.data.clinicId) && resource.data.doctorId == request.auth.uid) ||
+        isReceptionist(resource.data.clinicId) ||
+        isOwner(resource.data.clinicId)
+      );
+      allow create: if isAuthenticated() && isStaff(request.resource.data.clinicId);
+      allow update: if isAuthenticated() && (
+        (isDoctor(resource.data.clinicId) && resource.data.doctorId == request.auth.uid) ||
+        isReceptionist(resource.data.clinicId) ||
+        isOwner(resource.data.clinicId)
+      );
+      allow delete: if isAuthenticated() && isOwner(resource.data.clinicId);
+    }
+
+    // Notifications collection: Scoped by clinicId
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (
+        (isDoctor(resource.data.clinicId) && resource.data.doctorId == request.auth.uid) ||
+        isReceptionist(resource.data.clinicId) ||
+        isOwner(resource.data.clinicId)
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        (isDoctor(resource.data.clinicId) && resource.data.doctorId == request.auth.uid) ||
+        isReceptionist(resource.data.clinicId) ||
+        isOwner(resource.data.clinicId)
+      );
+    }
+
+    // Treatment plans collection: Scoped by clinicId
+    match /treatmentPlans/{planId} {
+      allow read: if isAuthenticated() && (
+        (isDoctor(resource.data.clinicId) && resource.data.doctorId == request.auth.uid) ||
+        isReceptionist(resource.data.clinicId) ||
+        isOwner(resource.data.clinicId)
+      );
+      allow create: if isAuthenticated() && isDoctor(request.resource.data.clinicId) && request.resource.data.doctorId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        (isDoctor(resource.data.clinicId) && resource.data.doctorId == request.auth.uid) ||
+        isOwner(resource.data.clinicId)
+      );
+      allow delete: if isAuthenticated() && isOwner(resource.data.clinicId);
+    }
+
+    // Audit logs: Server-written only. Read permitted only to clinic owners.
+    match /auditLogs/{logId} {
+      allow read: if isAuthenticated() && isOwner(resource.data.clinicId);
+      allow write: if false;
+    }
+  }
+}

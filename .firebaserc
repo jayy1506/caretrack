@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "caretrack-dev",
+    "development": "caretrack-dev",
+    "staging": "caretrack-staging",
+    "production": "caretrack-prod"
+  }
+}

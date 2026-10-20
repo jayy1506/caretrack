@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "doctor": "^0.3.0",
+    "flutter": "^0.0.5"
+  }
+}

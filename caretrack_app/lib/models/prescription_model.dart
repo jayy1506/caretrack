@@ -1,0 +1,119 @@
+class MedicineItemModel {
+  String name;
+  String dosage;
+  String frequency;
+  String duration;
+  String instructions;
+
+  MedicineItemModel({
+    required this.name,
+    this.dosage = '',
+    this.frequency = '',
+    this.duration = '',
+    this.instructions = '',
+  });
+
+  factory MedicineItemModel.fromMap(Map<String, dynamic> map) {
+    return MedicineItemModel(
+      name: map['name'] ?? '',
+      dosage: map['dosage'] ?? '',
+      frequency: map['frequency'] ?? '',
+      duration: map['duration'] ?? '',
+      instructions: map['instructions'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'dosage': dosage,
+      'frequency': frequency,
+      'duration': duration,
+      'instructions': instructions,
+    };
+  }
+}
+
+class PrescriptionModel {
+  final String id;
+  final String clinicId;
+  final String doctorId;
+  final String patientId;
+  final String prescriptionDate; // YYYY-MM-DD
+  final String source; // 'manual' | 'upload'
+  final String? originalFileUrl;
+  final List<MedicineItemModel> medicines;
+  final String followUpType; // '15_days' | '1_month' | '3_months' | '6_months' | 'custom'
+  final String followUpDate; // YYYY-MM-DD
+  final bool aiExtracted;
+  final bool doctorConfirmed;
+  final DateTime createdAt;
+
+  PrescriptionModel({
+    required this.id,
+    this.clinicId = 'default-clinic',
+    required this.doctorId,
+    required this.patientId,
+    required this.prescriptionDate,
+    this.source = 'manual',
+    this.originalFileUrl,
+    required this.medicines,
+    this.followUpType = '3_months',
+    required this.followUpDate,
+    this.aiExtracted = false,
+    this.doctorConfirmed = true,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
+
+  factory PrescriptionModel.fromMap(Map<String, dynamic> map, String id) {
+    final rawMedicines = map['medicines'] as List<dynamic>? ?? [];
+    final parsedMedicines = rawMedicines
+        .map((m) => MedicineItemModel.fromMap(Map<String, dynamic>.from(m)))
+        .toList();
+
+    DateTime parseDate(dynamic val) {
+      if (val == null) return DateTime.now();
+      if (val is DateTime) return val;
+      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      try {
+        return val.toDate();
+      } catch (_) {
+        return DateTime.now();
+      }
+    }
+
+    return PrescriptionModel(
+      id: id,
+      clinicId: map['clinicId'] ?? 'default-clinic',
+      doctorId: map['doctorId'] ?? '',
+      patientId: map['patientId'] ?? '',
+      prescriptionDate: map['prescriptionDate'] ?? '',
+      source: map['source'] ?? 'manual',
+      originalFileUrl: map['originalFileUrl'],
+      medicines: parsedMedicines,
+      followUpType: map['followUpType'] ?? '3_months',
+      followUpDate: map['followUpDate'] ?? '',
+      aiExtracted: map['aiExtracted'] ?? false,
+      doctorConfirmed: map['doctorConfirmed'] ?? true,
+      createdAt: parseDate(map['createdAt']),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'clinicId': clinicId,
+      'doctorId': doctorId,
+      'patientId': patientId,
+      'prescriptionDate': prescriptionDate,
+      'source': source,
+      'originalFileUrl': originalFileUrl,
+      'medicines': medicines.map((m) => m.toMap()).toList(),
+      'followUpType': followUpType,
+      'followUpDate': followUpDate,
+      'aiExtracted': aiExtracted,
+      'doctorConfirmed': doctorConfirmed,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+}
