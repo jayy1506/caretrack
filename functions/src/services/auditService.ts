@@ -6,7 +6,7 @@ export interface LogAuditParams {
   clinicId: string;
   userId: string;
   action: string;
-  entityType: 'patient' | 'prescription' | 'appointment' | 'staff' | 'clinic' | 'plan';
+  entityType: 'patient' | 'prescription' | 'appointment' | 'staff' | 'clinic' | 'plan' | 'ai' | 'conversation';
   entityId: string;
   details?: Record<string, any>;
 }
@@ -17,6 +17,9 @@ export interface LogAuditParams {
  */
 export class AuditService {
   public static async log(params: LogAuditParams): Promise<void> {
+    if (process.env.NODE_ENV === 'test' && !process.env.FIRESTORE_EMULATOR_HOST) {
+      return;
+    }
     try {
       const docRef = db.collection(COLLECTIONS.AUDIT_LOGS).doc();
       

@@ -1,0 +1,36 @@
+{
+  "id": "synthetic_sample_01",
+  "disclaimer": "SYNTHETIC_DATA_FOR_EVALUATION_ONLY - No real patient data",
+  "input": {
+    "simulatedText": "Dr. Sharma Dental Care\nPatient: John Doe (35/M)\nDate: 2026-10-15\n\nRx:\n1. Tab. Amoxicillin 500mg - 1 cap - TDS (Three times a day) x 5 days (After food)\n2. Tab. Combiflam (Ibuprofen 400mg + Paracetamol 325mg) - 1 tab - BD x 3 days (SOS pain, After food)\n3. Chlorhexidine Mouthwash 0.2% - 10ml - BD x 7 days\n\nFollow up: Review after 7 days for suture removal",
+    "mimeType": "text/plain"
+  },
+  "expected": {
+    "medicines": [
+      {
+        "name": "Amoxicillin 500mg",
+        "dosage": "1 cap",
+        "frequency": "TDS",
+        "duration": "5 days",
+        "instructions": "After food"
+      },
+      {
+        "name": "Combiflam",
+        "dosage": "1 tab",
+        "frequency": "BD",
+        "duration": "3 days",
+        "instructions": "SOS pain, After food"
+      },
+      {
+        "name": "Chlorhexidine Mouthwash 0.2%",
+        "dosage": "10ml",
+        "frequency": "BD",
+        "duration": "7 days",
+        "instructions": "Rinse mouth"
+      }
+    ],
+    "prescriptionDate": "2026-10-15",
+    "followUpInstructions": "Review after 7 days for suture removal",
+    "suggestedFollowUpType": "15_days"
+  }
+}

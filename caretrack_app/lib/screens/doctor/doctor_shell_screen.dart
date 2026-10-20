@@ -32,7 +32,7 @@ class _DoctorShellScreenState extends State<DoctorShellScreen> {
     final connectivity = Provider.of<ConnectivityService>(context);
     final auth = Provider.of<AuthService>(context);
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 800;
+    final isDesktop = screenWidth >= 900;
 
     final List<Widget> screens = [
       DoctorDashboardScreen(onNavigateTab: _onTabTapped),

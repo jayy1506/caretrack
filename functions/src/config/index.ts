@@ -20,6 +20,8 @@ export const config = {
   messagingProvider: (process.env.MESSAGING_PROVIDER || 'whatsapp') as 'whatsapp' | 'telegram' | 'none',
   whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
   whatsappAccessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
+  whatsappAppSecret: process.env.WHATSAPP_APP_SECRET || '',
+  whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'caretrack_webhook_token',
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   baseAppUrl: process.env.BASE_APP_URL || 'https://caretrack-47af5.web.app',
 };
@@ -33,5 +35,14 @@ export const COLLECTIONS = {
   APPOINTMENTS: 'appointments',
   NOTIFICATIONS: 'notifications',
   TREATMENT_PLANS: 'treatmentPlans',
+  PLAN_TEMPLATES: 'planTemplates',
+  RECALL_LIST: 'recallList',
+  RECALL_CAMPAIGNS: 'recallCampaigns',
+  CONVERSATIONS: 'conversations',
+  CARE_TEMPLATES: 'careTemplates',
+  MEDICATION_SCHEDULES: 'medicationSchedules',
+  MEDICATION_REMINDERS_LOG: 'medicationRemindersLog',
+  CLINIC_DOCUMENTS: 'clinicDocuments',
   AUDIT_LOGS: 'auditLogs',
+  FEEDBACK: 'feedback',
 } as const;

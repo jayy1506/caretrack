@@ -4,6 +4,7 @@ import '../../../services/auth_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 import 'demo_settings_screen.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -73,8 +74,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             // Settings Section
             const Text(
-              'App Settings',
+              'App & Clinic Settings',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.slateDark),
+            ),
+            const SizedBox(height: 10),
+
+            ListTile(
+              tileColor: AppTheme.surfaceWhite,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: AppTheme.borderGrey),
+              ),
+              leading: const Icon(Icons.tune_rounded, color: AppTheme.primaryTeal),
+              title: const Text('Clinic Profile, Hours & Features', style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('Holidays, staff team, plan templates & toggles'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              ),
             ),
             const SizedBox(height: 10),
 

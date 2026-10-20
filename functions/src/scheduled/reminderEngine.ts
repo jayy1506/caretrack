@@ -5,6 +5,7 @@ import { db, COLLECTIONS } from '../config/index.js';
 import { FollowUpService } from '../services/followUpService.js';
 import { NotificationService } from '../services/notificationService.js';
 import { EmailService } from '../services/emailService.js';
+import { markPlanAtRiskIfMissed } from '../treatmentPlans/index.js';
 import { AppointmentDocument, PatientDocument, UserDocument } from '../types/index.js';
 
 /**
@@ -164,12 +165,58 @@ export async function processAppointmentReminders(options: {
 }
 
 /**
+ * Detect overdue appointments and mark them as Missed if unfulfilled after 6 hours.
+ * Automatically checks and flags linked treatment plans as at_risk.
+ */
+export async function detectOverdueAppointments(): Promise<{ checked: number; markedMissed: number }> {
+  const now = new Date();
+  let checked = 0;
+  let markedMissed = 0;
+
+  try {
+    const snapshot = await db
+      .collection(COLLECTIONS.APPOINTMENTS)
+      .where('status', 'in', ['Scheduled', 'Confirmed'])
+      .get();
+
+    for (const doc of snapshot.docs) {
+      checked++;
+      const appt = doc.data() as AppointmentDocument;
+      try {
+        const apptDateTime = FollowUpService.parseAppointmentDateTime(appt.date, appt.time);
+        const timeDiffMs = now.getTime() - apptDateTime.getTime();
+        // If appointment time was more than 6 hours ago
+        if (timeDiffMs > 6 * 60 * 60 * 1000) {
+          await doc.ref.update({
+            status: 'Missed',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          await markPlanAtRiskIfMissed(doc.id);
+          markedMissed++;
+        }
+      } catch (err) {
+        console.error(`Error processing overdue check for appt ${doc.id}:`, err);
+      }
+    }
+  } catch (err) {
+    console.error('Error querying overdue appointments:', err);
+  }
+
+  return { checked, markedMissed };
+}
+
+/**
  * Cloud Scheduler 2nd Gen scheduled job (Runs every 15 minutes)
  */
 export const scheduledReminderEngine = onSchedule('every 15 minutes', async (event) => {
   console.log('Running automatic 24-hour scheduled reminder engine...');
   const result = await processAppointmentReminders({ isDemoMode: false });
   console.log(`Reminder engine execution finished: Processed=${result.processed}, Sent=${result.sent}, Errors=${result.errors}`);
+
+  const overdue = await detectOverdueAppointments();
+  if (overdue.markedMissed > 0) {
+    console.log(`Overdue appointments marked missed: ${overdue.markedMissed} of ${overdue.checked}`);
+  }
 });
 
 /**
@@ -187,9 +234,14 @@ export const triggerDemoReminderCheck = onCall({ cors: true }, async (request) =
     demoOffsetMinutes: offsetMinutes,
   });
 
+  const overdue = await detectOverdueAppointments();
+
   return {
     success: true,
-    message: `Demo reminder check triggered with ${offsetMinutes}m offset.`,
+    message: `Demo reminder check triggered with ${offsetMinutes}m offset. Overdue marked: ${overdue.markedMissed}`,
     ...result,
+    overdueChecked: overdue.checked,
+    overdueMarkedMissed: overdue.markedMissed,
   };
 });
+

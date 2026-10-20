@@ -9,6 +9,8 @@ class PatientModel {
   final String? email;
   final String? address;
   final String status; // 'active' | 'archived'
+  final List<String> allergies;
+  final int? preferredReminderHour;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -23,6 +25,8 @@ class PatientModel {
     this.email,
     this.address,
     this.status = 'active',
+    this.allergies = const [],
+    this.preferredReminderHour,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now(),
@@ -54,6 +58,10 @@ class PatientModel {
       email: map['email'],
       address: map['address'],
       status: map['status'] ?? 'active',
+      allergies: map['allergies'] != null ? List<String>.from(map['allergies']) : [],
+      preferredReminderHour: map['preferredReminderHour'] != null
+          ? int.tryParse(map['preferredReminderHour'].toString())
+          : null,
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
     );
@@ -71,6 +79,8 @@ class PatientModel {
       'email': email,
       'address': address,
       'status': status,
+      'allergies': allergies,
+      'preferredReminderHour': preferredReminderHour,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -87,6 +97,8 @@ class PatientModel {
     String? email,
     String? address,
     String? status,
+    List<String>? allergies,
+    int? preferredReminderHour,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -101,6 +113,8 @@ class PatientModel {
       email: email ?? this.email,
       address: address ?? this.address,
       status: status ?? this.status,
+      allergies: allergies ?? this.allergies,
+      preferredReminderHour: preferredReminderHour ?? this.preferredReminderHour,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

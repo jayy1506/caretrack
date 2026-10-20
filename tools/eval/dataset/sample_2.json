@@ -1,0 +1,36 @@
+{
+  "id": "synthetic_sample_02",
+  "disclaimer": "SYNTHETIC_DATA_FOR_EVALUATION_ONLY - No real patient data",
+  "input": {
+    "simulatedText": "Apex Dental Clinic\nDate: 2026-10-18\nPatient: Rajesh Patel\n\n1. Tab Augmentin 625mg - 1 tab - BD x 5 days (After meals)\n2. Tab Ketorol DT - 1 tab - TDS x 2 days (Disperse in water)\n3. Tab Pantop 40mg - 1 tab - OD (Morning before food) x 5 days\n\nFollow up: In 15 days for crown cementation",
+    "mimeType": "text/plain"
+  },
+  "expected": {
+    "medicines": [
+      {
+        "name": "Augmentin 625mg",
+        "dosage": "1 tab",
+        "frequency": "BD",
+        "duration": "5 days",
+        "instructions": "After meals"
+      },
+      {
+        "name": "Ketorol DT",
+        "dosage": "1 tab",
+        "frequency": "TDS",
+        "duration": "2 days",
+        "instructions": "Disperse in water"
+      },
+      {
+        "name": "Pantop 40mg",
+        "dosage": "1 tab",
+        "frequency": "OD",
+        "duration": "5 days",
+        "instructions": "Morning before food"
+      }
+    ],
+    "prescriptionDate": "2026-10-18",
+    "followUpInstructions": "In 15 days for crown cementation",
+    "suggestedFollowUpType": "15_days"
+  }
+}

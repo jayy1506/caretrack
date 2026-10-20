@@ -14,6 +14,8 @@ import 'patients/add_patient_screen.dart';
 import 'patients/patient_detail_screen.dart';
 import 'appointments/add_appointment_screen.dart';
 import 'prescriptions/add_prescription_screen.dart';
+import '../../widgets/risk_chip.dart';
+import '../../widgets/counter_tile.dart';
 
 class DoctorDashboardScreen extends StatefulWidget {
   final Function(int)? onNavigateTab;
@@ -144,16 +146,21 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     _buildHeroBanner(todayAppointments.length, allPatients.length),
                     const SizedBox(height: 20),
 
-                    // Responsive KPI Stats Grid with Live Patient Count
+                    // Responsive 4 Counter Tiles (Today, 3 days, 7 days, Overdue in red)
                     _buildKpiGrid(
-                      patientCount: allPatients.length,
                       todayCount: todayAppointments.length,
-                      pendingCount: pendingConfirmations.length,
-                      due7dCount: followUpsDue3Days.length + followUpsDue7Days.length,
+                      due3dCount: followUpsDue3Days.length,
+                      due7dCount: followUpsDue7Days.length,
                       overdueCount: followUpsOverdue.length,
                       isDesktop: isDesktop,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
+
+                    // Overdue Follow-up Card with One-Tap Remind Action
+                    if (followUpsOverdue.isNotEmpty) ...[
+                      _buildOverdueHeroCard(context, followUpsOverdue, doctorId),
+                      const SizedBox(height: 20),
+                    ],
 
                     // Quick Action Buttons Bar
                     _buildQuickActionBar(context),
@@ -315,24 +322,51 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   }
 
   Widget _buildKpiGrid({
-    required int patientCount,
     required int todayCount,
-    required int pendingCount,
+    required int due3dCount,
     required int due7dCount,
     required int overdueCount,
     required bool isDesktop,
   }) {
-    final cards = [
-      _buildStatCard('Total Patients', '$patientCount', 'Active records', Icons.people_alt_outlined, const Color(0xFF6366F1), const Color(0xFFEEF2FF), 'patients'),
-      _buildStatCard('Today\'s Visits', '$todayCount', 'Scheduled today', Icons.calendar_today, const Color(0xFF2563EB), const Color(0xFFEFF6FF), 'today'),
-      _buildStatCard('Pending Reply', '$pendingCount', 'Awaiting reply', Icons.mark_email_unread_outlined, const Color(0xFFD97706), const Color(0xFFFFFBEB), 'pending'),
-      _buildStatCard('Follow-ups in 7d', '$due7dCount', 'Auto reminders', Icons.schedule, const Color(0xFF0D9488), const Color(0xFFF0FDFA), 'due7d'),
-      _buildStatCard('Overdue Recalls', '$overdueCount', 'Requires review', Icons.warning_amber_rounded, const Color(0xFFDC2626), const Color(0xFFFEF2F2), 'overdue'),
+    final tiles = [
+      CounterTile(
+        label: "Today's Visits",
+        count: todayCount,
+        subtitle: 'Scheduled visits',
+        icon: Icons.calendar_today,
+        color: AppTheme.primaryTeal,
+        onTap: () => setState(() => _selectedFilter = _selectedFilter == 'today' ? 'all' : 'today'),
+      ),
+      CounterTile(
+        label: 'Due in 3 Days',
+        count: due3dCount,
+        subtitle: 'Upcoming follow-ups',
+        icon: Icons.schedule,
+        color: const Color(0xFF2563EB),
+        onTap: () => setState(() => _selectedFilter = _selectedFilter == 'due7d' ? 'all' : 'due7d'),
+      ),
+      CounterTile(
+        label: 'Due in 7 Days',
+        count: due7dCount,
+        subtitle: 'Auto-reminders queued',
+        icon: Icons.date_range,
+        color: AppTheme.mintAccent,
+        onTap: () => setState(() => _selectedFilter = _selectedFilter == 'due7d' ? 'all' : 'due7d'),
+      ),
+      CounterTile(
+        label: 'Overdue Recalls',
+        count: overdueCount,
+        subtitle: 'Requires action',
+        icon: Icons.warning_amber_rounded,
+        color: AppTheme.statusMissedText,
+        isDanger: true,
+        onTap: () => setState(() => _selectedFilter = _selectedFilter == 'overdue' ? 'all' : 'overdue'),
+      ),
     ];
 
     if (isDesktop) {
       return Row(
-        children: cards.map((c) => Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: c))).toList(),
+        children: tiles.map((t) => Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 5), child: t))).toList(),
       );
     }
 
@@ -340,92 +374,106 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
       children: [
         Row(
           children: [
-            Expanded(child: cards[0]),
-            const SizedBox(width: 8),
-            Expanded(child: cards[1]),
+            Expanded(child: tiles[0]),
+            const SizedBox(width: 10),
+            Expanded(child: tiles[1]),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Row(
           children: [
-            Expanded(child: cards[2]),
-            const SizedBox(width: 8),
-            Expanded(child: cards[3]),
-            const SizedBox(width: 8),
-            Expanded(child: cards[4]),
+            Expanded(child: tiles[2]),
+            const SizedBox(width: 10),
+            Expanded(child: tiles[3]),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildStatCard(String label, String value, String subtitle, IconData icon, Color color, Color bgColor, String filterKey) {
-    final isSelected = _selectedFilter == filterKey;
+  Widget _buildOverdueHeroCard(BuildContext context, List<AppointmentModel> overdueList, String doctorId) {
+    if (overdueList.isEmpty) return const SizedBox.shrink();
+    final firstOverdue = overdueList.first;
 
-    return InkWell(
-      onTap: () => setState(() => _selectedFilter = _selectedFilter == filterKey ? 'all' : filterKey),
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? color : const Color(0xFFE2E8F0),
-            width: isSelected ? 2 : 1,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.statusMissedBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.statusMissedText.withAlpha(51)),
+        boxShadow: AppTheme.softShadow,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.statusMissedText.withAlpha(25),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.alarm_off, color: AppTheme.statusMissedText, size: 28),
           ),
-          boxShadow: AppTheme.softShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: bgColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: color, size: 18),
-                ),
                 Text(
-                  value,
+                  '${overdueList.length} Overdue Patient Follow-up${overdueList.length > 1 ? "s" : ""}',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: color,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: AppTheme.statusMissedText,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Immediate attention needed. Tap Remind to dispatch an instant follow-up notification.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: AppTheme.slateMuted,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text(
-              label,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.slateDark,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.statusMissedText,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 10,
-                color: AppTheme.slateMuted,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
+            icon: const Icon(Icons.send_rounded, size: 16),
+            label: const Text('Remind', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            onPressed: () => _triggerOneTapRemind(context, firstOverdue, doctorId),
+          ),
+        ],
       ),
     );
   }
+
+  void _triggerOneTapRemind(BuildContext context, AppointmentModel appt, String doctorId) async {
+    final patient = await _patientService.getPatient(appt.patientId);
+    if (!context.mounted) return;
+
+    if (patient?.phone != null && patient!.phone!.isNotEmpty) {
+      _commsService.sendSms(
+        doctorId: doctorId,
+        patientId: appt.patientId,
+        phone: patient.phone!,
+        message: 'Dear ${patient.name}, your dental follow-up visit with CareTrack is overdue. Please call our clinic to confirm your visit.',
+        context: context,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No patient phone number available to remind.')),
+      );
+    }
+  }
+
+
 
   Widget _buildRecentPatientsSection(BuildContext context, List<PatientModel> patients, String doctorId) {
     final recent = patients.take(6).toList();
@@ -948,8 +996,21 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     ),
                   ),
 
-                  // Status Badge
-                  StatusBadge(status: appt.confirmationStatus),
+                  // Status & Risk Badges
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      StatusBadge(status: appt.confirmationStatus),
+                      if (appt.riskScore != null || appt.riskLevel != null) ...[
+                        const SizedBox(height: 6),
+                        RiskChip(
+                          riskScore: appt.riskScore,
+                          riskLevel: appt.riskLevel,
+                          riskFactors: appt.riskFactors,
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
 

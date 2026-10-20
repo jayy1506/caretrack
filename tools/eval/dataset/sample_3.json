@@ -1,0 +1,29 @@
+{
+  "id": "synthetic_sample_03",
+  "disclaimer": "SYNTHETIC_DATA_FOR_EVALUATION_ONLY - No real patient data",
+  "input": {
+    "simulatedText": "Smile Dental Hub\nDate: 2026-10-10\n\nPrescription:\n- Tab Metrogyl 400mg 1 tab TDS 5 days\n- Tab Dolo 650mg 1 tab SOS 3 days (Max 3 times daily)\n\nNext visit: Review in 6 months for scaling checkup",
+    "mimeType": "text/plain"
+  },
+  "expected": {
+    "medicines": [
+      {
+        "name": "Metrogyl 400mg",
+        "dosage": "1 tab",
+        "frequency": "TDS",
+        "duration": "5 days",
+        "instructions": "Oral"
+      },
+      {
+        "name": "Dolo 650mg",
+        "dosage": "1 tab",
+        "frequency": "SOS",
+        "duration": "3 days",
+        "instructions": "Max 3 times daily"
+      }
+    ],
+    "prescriptionDate": "2026-10-10",
+    "followUpInstructions": "Review in 6 months for scaling checkup",
+    "suggestedFollowUpType": "6_months"
+  }
+}

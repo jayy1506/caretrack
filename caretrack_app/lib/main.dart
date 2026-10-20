@@ -9,6 +9,7 @@ import 'services/connectivity_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/doctor/doctor_shell_screen.dart';
+import 'screens/receptionist/receptionist_shell_screen.dart';
 
 import 'services/clinic_service.dart';
 
@@ -46,6 +47,8 @@ class CareTrackApp extends StatelessWidget {
       title: 'CareTrack',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
       home: const AuthGate(),
     );
   }
@@ -83,6 +86,9 @@ class AuthGate extends StatelessWidget {
     // Role-based routing
     if (auth.currentUser!.isAdmin) {
       return const AdminDashboardScreen();
+    }
+    if (auth.currentUser!.isReceptionist) {
+      return ReceptionistShellScreen(clinicId: auth.currentUser!.clinicId);
     }
 
     return const DoctorShellScreen();

@@ -12,6 +12,10 @@ class AppointmentModel {
   final String confirmationStatus; // 'Pending' | 'Confirmed' | 'Declined' | 'Reschedule Requested'
   final bool reminder24hSent;
   final DateTime? lastReminderSentAt;
+  final double? riskScore;
+  final String? riskLevel; // 'low' | 'medium' | 'high'
+  final List<String>? riskFactors;
+  final bool extraReminderSent;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -29,6 +33,10 @@ class AppointmentModel {
     this.confirmationStatus = 'Pending',
     this.reminder24hSent = false,
     this.lastReminderSentAt,
+    this.riskScore,
+    this.riskLevel,
+    this.riskFactors,
+    this.extraReminderSent = false,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now(),
@@ -66,6 +74,10 @@ class AppointmentModel {
       confirmationStatus: map['confirmationStatus'] ?? 'Pending',
       reminder24hSent: map['reminder24hSent'] ?? false,
       lastReminderSentAt: map['lastReminderSentAt'] != null ? parseDate(map['lastReminderSentAt']) : null,
+      riskScore: (map['riskScore'] is num) ? (map['riskScore'] as num).toDouble() : null,
+      riskLevel: map['riskLevel'],
+      riskFactors: map['riskFactors'] != null ? List<String>.from(map['riskFactors']) : null,
+      extraReminderSent: map['extraReminderSent'] ?? false,
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
     );
@@ -86,6 +98,10 @@ class AppointmentModel {
       'confirmationStatus': confirmationStatus,
       'reminder24hSent': reminder24hSent,
       'lastReminderSentAt': lastReminderSentAt?.toIso8601String(),
+      'riskScore': riskScore,
+      'riskLevel': riskLevel,
+      'riskFactors': riskFactors,
+      'extraReminderSent': extraReminderSent,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };

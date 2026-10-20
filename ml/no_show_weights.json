@@ -1,0 +1,22 @@
+{
+  "disclaimer": "SYNTHETIC_MODEL_WEIGHTS_ONLY - Requires clinic-specific retraining with real historical data",
+  "trainedAt": "2026-10-20T10:26:49.532294Z",
+  "metrics": {
+    "rocAuc": 0.7955,
+    "brierScore": 0.1656,
+    "trainSampleSize": 1200,
+    "testSampleSize": 300
+  },
+  "featureWeights": {
+    "intercept": -1.1459,
+    "lead_time_normalized": 0.22528,
+    "past_misses_normalized": 0.42859,
+    "non_attendance_rate": 0.32569,
+    "is_unconfirmed": 0.66493,
+    "is_confirmed": -0.80511,
+    "is_whatsapp": -0.05338,
+    "is_weekend": 0.03974,
+    "is_late_hour": 0.20073,
+    "plan_stage_normalized": -0.00862
+  }
+}
