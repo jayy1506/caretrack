@@ -414,3 +414,48 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# CareTrack Edge Functions JWT Verification Configurations
+# Public functions have verify_jwt = false; all other functions verify JWT
+[functions.confirm-appointment]
+verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.get-slots]
+verify_jwt = false
+
+[functions.book-slot]
+verify_jwt = false
+
+[functions.send-notifications]
+verify_jwt = false # Authenticated via X-Job-Secret or Service Role key
+
+[functions.medication-reminders]
+verify_jwt = false # Authenticated via X-Job-Secret for dispatch, or caller JWT for generate
+
+[functions.create-staff]
+verify_jwt = true
+
+[functions.extract-prescription]
+verify_jwt = true
+
+[functions.send-direct-message]
+verify_jwt = true
+
+[functions.retry-notification]
+verify_jwt = true
+
+[functions.recall-list]
+verify_jwt = true
+
+[functions.send-recall]
+verify_jwt = true
+
+[functions.treatment-plans]
+verify_jwt = true
+
+[functions.patient-data-tools]
+verify_jwt = true
+
