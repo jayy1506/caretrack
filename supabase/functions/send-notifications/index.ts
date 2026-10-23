@@ -54,9 +54,16 @@ serve(async (req: Request) => {
 
   const service = createServiceClient();
 
+  const url = new URL(req.url);
+  const minHours = url.searchParams.get("min_hours") ? parseInt(url.searchParams.get("min_hours")!, 10) : 23;
+  const maxHours = url.searchParams.get("max_hours") ? parseInt(url.searchParams.get("max_hours")!, 10) : 25;
+  const limitCount = url.searchParams.get("limit") ? parseInt(url.searchParams.get("limit")!, 10) : 50;
+
   // 1. Claim due reminders atomically via the claim_due_reminders() function
   const { data: claimedAppointments, error: claimError } = await service.rpc("claim_due_reminders", {
-    limit_count: 50,
+    limit_count: limitCount,
+    min_hours: minHours,
+    max_hours: maxHours,
   });
 
   if (claimError) {

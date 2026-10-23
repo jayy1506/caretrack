@@ -435,6 +435,9 @@ verify_jwt = false # Authenticated via X-Job-Secret or Service Role key
 [functions.medication-reminders]
 verify_jwt = false # Authenticated via X-Job-Secret for dispatch, or caller JWT for generate
 
+[functions.post-treatment-care]
+verify_jwt = false # Authenticated via X-Job-Secret or Service Role key
+
 [functions.create-staff]
 verify_jwt = true
 

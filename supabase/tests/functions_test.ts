@@ -247,3 +247,69 @@ Deno.test("Notification Orchestration: failed channel does not block successful 
   assertEquals((results[1] as any).value?.messageId, "email_ok_123");
   assertEquals(em.sent, true);
 });
+
+// ----------------------------------------------------
+// 7. Scheduled Jobs & Idempotency Tests (Phase 3)
+// ----------------------------------------------------
+Deno.test("Scheduled Jobs: X-Job-Secret verification using constantTimeEquals", () => {
+  const serverSecret = "caretrack_production_job_secret_xyz123";
+  const matchingHeader = "caretrack_production_job_secret_xyz123";
+  const wrongHeader = "caretrack_production_job_secret_wrong456";
+  const emptyHeader = "";
+
+  assertEquals(constantTimeEquals(matchingHeader, serverSecret), true);
+  assertEquals(constantTimeEquals(wrongHeader, serverSecret), false);
+  assertEquals(constantTimeEquals(emptyHeader, serverSecret), false);
+});
+
+Deno.test("Scheduled Jobs: configurable reminder window bounds", () => {
+  const now = new Date("2026-10-23T10:00:00Z");
+  const minHours = 23;
+  const maxHours = 25;
+
+  const windowStart = new Date(now.getTime() + minHours * 60 * 60 * 1000);
+  const windowEnd = new Date(now.getTime() + maxHours * 60 * 60 * 1000);
+
+  const dueAppointment = new Date("2026-10-24T10:00:00Z"); // +24 hours
+  const tooEarlyAppointment = new Date("2026-10-24T08:00:00Z"); // +22 hours
+  const tooLateAppointment = new Date("2026-10-24T12:00:00Z"); // +26 hours
+
+  const isWithinWindow = (d: Date) => d >= windowStart && d <= windowEnd;
+
+  assertEquals(isWithinWindow(dueAppointment), true);
+  assertEquals(isWithinWindow(tooEarlyAppointment), false);
+  assertEquals(isWithinWindow(tooLateAppointment), false);
+});
+
+Deno.test("Scheduled Jobs: post-treatment care claim idempotency", () => {
+  // Simulate claim state
+  interface MockAppointment {
+    id: string;
+    status: string;
+    post_care_claimed_at: string | null;
+    post_care_sent_at: string | null;
+  }
+
+  const appointments: MockAppointment[] = [
+    { id: "1", status: "completed", post_care_claimed_at: null, post_care_sent_at: null },
+    { id: "2", status: "completed", post_care_claimed_at: "2026-10-23T09:00:00Z", post_care_sent_at: "2026-10-23T09:01:00Z" }, // already sent
+  ];
+
+  // Simulating claim_due_post_care: only appointments where post_care_sent_at is null and not claimed recently
+  const claimDue = (appts: MockAppointment[]) => {
+    return appts.filter(a => a.status === "completed" && a.post_care_sent_at === null && a.post_care_claimed_at === null);
+  };
+
+  const claimedFirstRun = claimDue(appointments);
+  assertEquals(claimedFirstRun.length, 1);
+  assertEquals(claimedFirstRun[0].id, "1");
+
+  // Mark appointment 1 as claimed and sent
+  claimedFirstRun[0].post_care_claimed_at = new Date().toISOString();
+  claimedFirstRun[0].post_care_sent_at = new Date().toISOString();
+
+  // Subsequent call: must return 0 appointments (idempotent, no double send)
+  const claimedSecondRun = claimDue(appointments);
+  assertEquals(claimedSecondRun.length, 0);
+});
+

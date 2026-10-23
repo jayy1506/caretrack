@@ -116,3 +116,58 @@ flutter run \
      --dart-define=SUPABASE_URL=https://<YOUR_PROJECT_REF>.supabase.co \
      --dart-define=SUPABASE_ANON_KEY=<HOSTED_ANON_KEY>
    ```
+
+---
+
+## 6. Scheduled Jobs (pg_cron) & Supabase Vault
+
+CareTrack automates reminders and state management using `pg_cron` and `pg_net`. Secrets are stored securely in Supabase Vault rather than in plaintext SQL.
+
+### 6.1 Configuring Secrets in Supabase Vault
+
+In your Supabase SQL editor or migration runner:
+
+```sql
+-- Store Edge Function URL and Job Secret in Supabase Vault
+select vault.create_secret('https://<YOUR_PROJECT_REF>.supabase.co/functions/v1', 'edge_function_base_url', 'Base Edge Function endpoint');
+select vault.create_secret('<YOUR_JOB_SECRET>', 'job_secret', 'Cron Job Shared Authentication Secret');
+```
+
+### 6.2 Configured Scheduled Jobs
+
+| Job Name | Schedule | Target | Description |
+|---|---|---|---|
+| `send-notifications-hourly` | `0 * * * *` (Hourly) | `/send-notifications` | Dispatches reminders for appointments starting in 23h–25h (idempotent, SKIP LOCKED) |
+| `mark-missed-appointments-hourly`| `5 * * * *` (Hourly) | SQL `mark_missed_appointments()` | Auto-marks pending appointments older than 24h as missed |
+| `medication-reminders-daily` | `30 2 * * *` (08:00 IST) | `/medication-reminders?mode=dispatch` | Dispatches daily dose alerts and deactivates completed courses |
+| `post-treatment-care-hourly` | `15 * * * *` (Hourly) | `/post-treatment-care` | Sends recovery check-ins & instructions 2h after completed procedures |
+
+### 6.3 Running Jobs by Hand (SQL)
+
+To manually execute any background job directly in psql or the Supabase SQL editor:
+
+```sql
+-- 1. Trigger reminder notifications immediately:
+select trigger_edge_job('send-notifications');
+
+-- 2. Mark missed appointments:
+select mark_missed_appointments();
+
+-- 3. Trigger daily medication reminders:
+select trigger_edge_job('medication-reminders', 'mode=dispatch');
+
+-- 4. Trigger post-treatment care message dispatcher:
+select trigger_edge_job('post-treatment-care');
+```
+
+### 6.4 Manual Trigger via Demo Mode (Owner/Doctor RPC)
+
+From the Flutter app or authenticated client:
+
+```dart
+final result = await supabase.rpc('run_scheduled_job_manual', params: {
+  'job_name': 'all', // 'send-notifications' | 'mark-missed' | 'medication-reminders' | 'post-treatment-care' | 'all'
+});
+```
+*(Requires user role `owner` or `doctor`; denied for `receptionist` and anonymous callers).*
+
