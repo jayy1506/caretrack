@@ -79,8 +79,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: AppTheme.backgroundGrey,
+      backgroundColor: isDark ? AppTheme.darkBackground : AppTheme.backgroundGrey,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -90,10 +93,18 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? AppTheme.darkSurface : Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppTheme.borderGrey),
-                  boxShadow: AppTheme.softShadow,
+                  border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.borderGrey),
+                  boxShadow: isDark
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(80),
+                            blurRadius: 20,
+                            offset: const Offset(0, 6),
+                          ),
+                        ]
+                      : AppTheme.softShadow,
                 ),
                 child: Form(
                   key: _formKey,
@@ -107,12 +118,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: 52,
                           height: 52,
                           decoration: BoxDecoration(
-                            color: AppTheme.primaryNavy,
+                            color: isDark ? AppTheme.mintAccent.withAlpha(35) : AppTheme.primaryNavy,
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.local_hospital_rounded,
-                            color: Colors.white,
+                            color: isDark ? AppTheme.mintAccent : Colors.white,
                             size: 28,
                           ),
                         ),
@@ -124,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
-                          color: AppTheme.primaryNavy,
+                          color: isDark ? Colors.white : AppTheme.primaryNavy,
                           letterSpacing: -0.5,
                         ),
                       ),
@@ -136,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         textAlign: TextAlign.center,
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 13,
-                          color: AppTheme.slateMuted,
+                          color: isDark ? Colors.white70 : AppTheme.slateMuted,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -145,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: AppTheme.backgroundGrey,
+                          color: isDark ? AppTheme.darkCard : AppTheme.backgroundGrey,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -160,12 +171,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 9),
                                   decoration: BoxDecoration(
-                                    color: !_isSignUp ? Colors.white : Colors.transparent,
+                                    color: !_isSignUp
+                                        ? (isDark ? AppTheme.darkSurface : Colors.white)
+                                        : Colors.transparent,
                                     borderRadius: BorderRadius.circular(9),
                                     boxShadow: !_isSignUp
                                         ? [
                                             BoxShadow(
-                                              color: Colors.black.withAlpha(12),
+                                              color: Colors.black.withAlpha(isDark ? 50 : 12),
                                               blurRadius: 4,
                                               offset: const Offset(0, 2),
                                             ),
@@ -178,7 +191,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     style: GoogleFonts.plusJakartaSans(
                                       fontSize: 13,
                                       fontWeight: !_isSignUp ? FontWeight.w700 : FontWeight.w500,
-                                      color: !_isSignUp ? AppTheme.primaryNavy : AppTheme.slateMuted,
+                                      color: !_isSignUp
+                                          ? (isDark ? Colors.white : AppTheme.primaryNavy)
+                                          : (isDark ? Colors.white60 : AppTheme.slateMuted),
                                     ),
                                   ),
                                 ),
@@ -194,12 +209,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 9),
                                   decoration: BoxDecoration(
-                                    color: _isSignUp ? Colors.white : Colors.transparent,
+                                    color: _isSignUp
+                                        ? (isDark ? AppTheme.darkSurface : Colors.white)
+                                        : Colors.transparent,
                                     borderRadius: BorderRadius.circular(9),
                                     boxShadow: _isSignUp
                                         ? [
                                             BoxShadow(
-                                              color: Colors.black.withAlpha(12),
+                                              color: Colors.black.withAlpha(isDark ? 50 : 12),
                                               blurRadius: 4,
                                               offset: const Offset(0, 2),
                                             ),
@@ -212,7 +229,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     style: GoogleFonts.plusJakartaSans(
                                       fontSize: 13,
                                       fontWeight: _isSignUp ? FontWeight.w700 : FontWeight.w500,
-                                      color: _isSignUp ? AppTheme.primaryNavy : AppTheme.slateMuted,
+                                      color: _isSignUp
+                                          ? (isDark ? Colors.white : AppTheme.primaryNavy)
+                                          : (isDark ? Colors.white60 : AppTheme.slateMuted),
                                     ),
                                   ),
                                 ),
@@ -330,7 +349,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onPressed: () => _fillDemoCredentials('doctor.a@caretrack.local', 'Password@123'),
                                 style: OutlinedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(vertical: 10),
-                                  side: const BorderSide(color: AppTheme.borderGrey),
+                                  side: BorderSide(color: isDark ? AppTheme.darkBorder : AppTheme.borderGrey),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
                                 child: Text(
@@ -338,7 +357,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: AppTheme.primaryTeal,
+                                    color: isDark ? AppTheme.mintAccent : AppTheme.primaryTeal,
                                   ),
                                 ),
                               ),
@@ -349,7 +368,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onPressed: () => _fillDemoCredentials('receptionist.demo@caretrack.local', 'Password@123'),
                                 style: OutlinedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(vertical: 10),
-                                  side: const BorderSide(color: AppTheme.borderGrey),
+                                  side: BorderSide(color: isDark ? AppTheme.darkBorder : AppTheme.borderGrey),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
                                 child: Text(
@@ -357,7 +376,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: AppTheme.primaryNavy,
+                                    color: isDark ? Colors.white : AppTheme.primaryNavy,
                                   ),
                                 ),
                               ),
@@ -368,7 +387,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onPressed: () => _fillDemoCredentials('owner.demo@caretrack.local', 'Password@123'),
                                 style: OutlinedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(vertical: 10),
-                                  side: const BorderSide(color: AppTheme.borderGrey),
+                                  side: BorderSide(color: isDark ? AppTheme.darkBorder : AppTheme.borderGrey),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
                                 child: Text(
@@ -376,7 +395,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF6366F1),
+                                    color: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF6366F1),
                                   ),
                                 ),
                               ),

@@ -15,6 +15,7 @@ class CustomTextField extends StatelessWidget {
   final bool readOnly;
   final VoidCallback? onTap;
   final void Function(String)? onChanged;
+  final Color? textColor;
 
   const CustomTextField({
     super.key,
@@ -31,19 +32,28 @@ class CustomTextField extends StatelessWidget {
     this.readOnly = false,
     this.onTap,
     this.onChanged,
+    this.textColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Use pure crisp white text in dark mode or when specified
+    final effectiveTextColor = textColor ?? (isDark ? Colors.white : AppTheme.slateDark);
+    final effectiveLabelColor = isDark ? Colors.white : AppTheme.slateDark;
+    final effectiveHintColor = isDark ? Colors.white54 : AppTheme.slateMuted.withAlpha(150);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppTheme.slateDark,
+            color: effectiveLabelColor,
           ),
         ),
         const SizedBox(height: 6),
@@ -57,14 +67,36 @@ class CustomTextField extends StatelessWidget {
           readOnly: readOnly,
           onTap: onTap,
           onChanged: onChanged,
-          style: const TextStyle(
+          cursorColor: isDark ? AppTheme.mintAccent : AppTheme.primaryTeal,
+          style: TextStyle(
             fontSize: 14,
-            color: AppTheme.slateDark,
+            fontWeight: FontWeight.w500,
+            color: effectiveTextColor, // Crisp white writing text in dark mode!
           ),
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: prefixIcon,
-            suffixIcon: suffixIcon,
+            hintStyle: TextStyle(
+              fontSize: 14,
+              color: effectiveHintColor,
+            ),
+            prefixIcon: prefixIcon != null
+                ? IconTheme(
+                    data: IconThemeData(
+                      color: isDark ? Colors.white70 : AppTheme.slateMuted,
+                      size: 18,
+                    ),
+                    child: prefixIcon!,
+                  )
+                : null,
+            suffixIcon: suffixIcon != null
+                ? IconTheme(
+                    data: IconThemeData(
+                      color: isDark ? Colors.white70 : AppTheme.slateMuted,
+                      size: 18,
+                    ),
+                    child: suffixIcon!,
+                  )
+                : null,
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           ),
         ),
