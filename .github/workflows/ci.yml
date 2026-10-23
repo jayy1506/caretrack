@@ -1,0 +1,61 @@
+name: CareTrack CI
+
+on:
+  push:
+    branches: [ "main", "supabase-migration" ]
+  pull_request:
+    branches: [ "main", "supabase-migration" ]
+
+jobs:
+  flutter-test:
+    name: Flutter Lint & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: caretrack_app
+        run: flutter pub get
+
+      - name: Analyze Flutter code
+        working-directory: caretrack_app
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run Flutter tests
+        working-directory: caretrack_app
+        run: flutter test
+
+  deno-supabase-test:
+    name: Supabase Edge Functions & Security Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type check Edge Functions
+        run: deno check supabase/functions/*/index.ts
+
+      - name: Run Deno Functions unit tests
+        run: deno test --allow-all supabase/tests/functions_test.ts
+
+      - name: Run Deno RLS Security tests
+        run: deno test supabase/tests/rls_test.ts
