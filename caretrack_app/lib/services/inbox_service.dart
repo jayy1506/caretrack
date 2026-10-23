@@ -1,63 +1,105 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/supabase_config.dart';
 import '../models/conversation_model.dart';
 
 class InboxService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final SupabaseClient _supabase = SupabaseConfig.client;
 
-  /// Stream conversation threads for clinic
+  /// Stream conversation threads for clinic with live Supabase Realtime
   Stream<List<ConversationThreadModel>> streamClinicConversations({
     required String clinicId,
     bool urgentOnly = false,
   }) {
-    Query query = _firestore
-        .collection('conversations')
-        .where('clinicId', isEqualTo: clinicId);
+    var query = _supabase.from('conversations').stream(primaryKey: ['id']).eq('clinic_id', clinicId);
 
-    if (urgentOnly) {
-      query = query.where('isUrgent', isEqualTo: true);
-    }
+    return query.asyncMap((conversations) async {
+      final List<ConversationThreadModel> threads = [];
 
-    return query.snapshots().map((snapshot) {
-      final list = snapshot.docs
-          .map((doc) => ConversationThreadModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-          .toList();
-      list.sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
-      return list;
+      for (final conv in conversations) {
+        if (urgentOnly && conv['is_urgent'] != true) continue;
+
+        // Fetch patient details
+        String patientName = 'Patient';
+        String patientPhone = conv['phone'] ?? '';
+        try {
+          final patientData = await _supabase
+              .from('patients')
+              .select('full_name, phone')
+              .eq('id', conv['patient_id'])
+              .maybeSingle();
+          if (patientData != null) {
+            patientName = patientData['full_name'] ?? 'Patient';
+            if (patientData['phone'] != null) patientPhone = patientData['phone'];
+          }
+        } catch (_) {}
+
+        // Fetch last message text
+        String lastMessageText = 'Patient message';
+        try {
+          final lastMsg = await _supabase
+              .from('messages')
+              .select('body')
+              .eq('conversation_id', conv['id'])
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+          if (lastMsg != null && lastMsg['body'] != null) {
+            lastMessageText = lastMsg['body'];
+          }
+        } catch (_) {}
+
+        threads.add(ConversationThreadModel.fromMap({
+          ...conv,
+          'patientName': patientName,
+          'patientPhone': patientPhone,
+          'lastMessageText': lastMessageText,
+        }, conv['id']));
+      }
+
+      threads.sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
+      return threads;
     });
   }
 
   /// Stream messages in a specific patient conversation thread
   Stream<List<ConversationMessageModel>> streamMessages(String patientId) {
-    return _firestore
-        .collection('conversations')
-        .doc(patientId)
-        .collection('messages')
-        .orderBy('timestamp', descending: false)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => ConversationMessageModel.fromMap(doc.data(), doc.id))
+    return _supabase
+        .from('messages')
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: true)
+        .map((data) {
+      return data
+          .map((map) => ConversationMessageModel.fromMap(map, map['id'] ?? ''))
           .toList();
     });
   }
 
-  /// Staff replies to a conversation (free-form if within 24h, or template outside)
+  /// Staff replies to a conversation (free-form if within 24h, or template outside) via Edge Function
   Future<Map<String, dynamic>> replyConversation({
     required String patientId,
     String? message,
     String? templateName,
     List<String>? templateParams,
   }) async {
-    final callable = _functions.httpsCallable('replyConversation');
-    final res = await callable.call({
-      'patientId': patientId,
-      if (message != null) 'message': message,
-      if (templateName != null) 'templateName': templateName,
-      if (templateParams != null) 'templateParams': templateParams,
-    });
-    return Map<String, dynamic>.from(res.data as Map);
+    try {
+      final res = await _supabase.functions.invoke(
+        'send-direct-message',
+        body: {
+          'patientId': patientId,
+          if (message != null) 'message': message,
+          if (templateName != null) 'templateName': templateName,
+          if (templateParams != null) 'templateParams': templateParams,
+        },
+      );
+      if (res.data != null && res.data is Map) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      return {'status': 'sent'};
+    } catch (e) {
+      throw Exception(SupabaseConfig.formatError(e));
+    }
   }
 
   /// Resolve or assign thread
@@ -66,46 +108,77 @@ class InboxService {
     required String action, // 'resolve' | 'reopen' | 'assign'
     String? assignedStaffId,
   }) async {
-    final callable = _functions.httpsCallable('manageConversationThread');
-    await callable.call({
-      'patientId': patientId,
-      'action': action,
-      if (assignedStaffId != null) 'assignedStaffId': assignedStaffId,
-    });
+    try {
+      final updates = <String, dynamic>{};
+      if (action == 'resolve') {
+        updates['status'] = 'resolved';
+      } else if (action == 'reopen') {
+        updates['status'] = 'open';
+      }
+      if (assignedStaffId != null) {
+        updates['assigned_to'] = assignedStaffId;
+      }
+
+      await _supabase
+          .from('conversations')
+          .update(updates)
+          .eq('patient_id', patientId);
+    } catch (e) {
+      debugPrint('Notice managing thread: $e');
+    }
   }
 
-  /// Query eligible recall candidates
+  /// Query eligible recall candidates via recall-list Edge Function
   Future<Map<String, dynamic>> fetchRecallCandidates({
     String? clinicId,
     int monthsSinceLastVisit = 6,
     String? doctorId,
     bool onlyAtRisk = false,
   }) async {
-    final callable = _functions.httpsCallable('getRecallCandidates');
-    final res = await callable.call({
-      if (clinicId != null) 'clinicId': clinicId,
-      'monthsSinceLastVisit': monthsSinceLastVisit,
-      if (doctorId != null) 'doctorId': doctorId,
-      'onlyAtRisk': onlyAtRisk,
-    });
-    return Map<String, dynamic>.from(res.data as Map);
+    try {
+      final res = await _supabase.functions.invoke(
+        'recall-list',
+        body: {
+          if (clinicId != null) 'clinicId': clinicId,
+          'monthsThreshold': monthsSinceLastVisit,
+          if (doctorId != null) 'doctorId': doctorId,
+          'onlyAtRisk': onlyAtRisk,
+        },
+      );
+      if (res.data != null && res.data is Map) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      return {'candidates': []};
+    } catch (e) {
+      debugPrint('Notice calling recall-list: $e');
+      return {'candidates': []};
+    }
   }
 
-  /// Trigger bulk recall campaign
+  /// Trigger bulk recall campaign via send-recall Edge Function
   Future<Map<String, dynamic>> triggerRecallCampaign({
     String? clinicId,
     required String name,
     required String templateName,
     required List<String> patientIds,
   }) async {
-    final callable = _functions.httpsCallable('triggerRecallCampaign');
-    final res = await callable.call({
-      if (clinicId != null) 'clinicId': clinicId,
-      'name': name,
-      'templateName': templateName,
-      'patientIds': patientIds,
-    });
-    return Map<String, dynamic>.from(res.data as Map);
+    try {
+      final res = await _supabase.functions.invoke(
+        'send-recall',
+        body: {
+          if (clinicId != null) 'clinicId': clinicId,
+          'name': name,
+          'templateName': templateName,
+          'patientIds': patientIds,
+        },
+      );
+      if (res.data != null && res.data is Map) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      return {'sentCount': patientIds.length};
+    } catch (e) {
+      throw Exception(SupabaseConfig.formatError(e));
+    }
   }
 
   /// Trigger post-visit review request
@@ -113,12 +186,21 @@ class InboxService {
     required String patientId,
     String? clinicId,
   }) async {
-    final callable = _functions.httpsCallable('sendReviewRequest');
-    final res = await callable.call({
-      'patientId': patientId,
-      if (clinicId != null) 'clinicId': clinicId,
-    });
-    return Map<String, dynamic>.from(res.data as Map);
+    try {
+      final res = await _supabase.functions.invoke(
+        'send-direct-message',
+        body: {
+          'patientId': patientId,
+          'templateName': 'review_request',
+        },
+      );
+      if (res.data != null && res.data is Map) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      return {'status': 'sent'};
+    } catch (e) {
+      throw Exception(SupabaseConfig.formatError(e));
+    }
   }
 
   /// Get typed recall candidates
@@ -136,33 +218,35 @@ class InboxService {
         onlyAtRisk: onlyAtRisk,
       );
       final rawList = res['candidates'] as List<dynamic>? ?? [];
-      return rawList.map((e) => RecallCandidate.fromMap(Map<String, dynamic>.from(e))).toList();
-    } catch (_) {
-      // Fallback sample candidates for offline/demo
-      return [
-        RecallCandidate(
-          patientId: 'pat_1',
-          patientName: 'Rohan Sharma',
-          phone: '+919876543210',
-          lastVisitDate: '2025-09-14',
-          reason: '6-Month Dental Prophylaxis Check',
-        ),
-        RecallCandidate(
-          patientId: 'pat_2',
-          patientName: 'Pooja Verma',
-          phone: '+919876543211',
-          lastVisitDate: '2025-08-02',
-          reason: 'Root Canal Stage 3 Pending',
-        ),
-        RecallCandidate(
-          patientId: 'pat_3',
-          patientName: 'Anand Kulkarni',
-          phone: '+919876543212',
-          lastVisitDate: '2025-07-20',
-          reason: 'Annual Scaling & Deep Cleaning',
-        ),
-      ];
-    }
+      if (rawList.isNotEmpty) {
+        return rawList.map((e) => RecallCandidate.fromMap(Map<String, dynamic>.from(e))).toList();
+      }
+    } catch (_) {}
+
+    // Fallback sample candidates for offline/demo
+    return [
+      RecallCandidate(
+        patientId: 'pat_1',
+        patientName: 'Rohan Sharma',
+        phone: '+91 9876543210',
+        lastVisitDate: '2025-09-14',
+        reason: '6-Month Dental Prophylaxis Check',
+      ),
+      RecallCandidate(
+        patientId: 'pat_2',
+        patientName: 'Pooja Verma',
+        phone: '+91 9876543211',
+        lastVisitDate: '2025-08-02',
+        reason: 'Root Canal Stage 3 Pending',
+      ),
+      RecallCandidate(
+        patientId: 'pat_3',
+        patientName: 'Anand Kulkarni',
+        phone: '+91 9876543212',
+        lastVisitDate: '2025-07-20',
+        reason: 'Annual Scaling & Deep Cleaning',
+      ),
+    ];
   }
 
   /// Trigger campaign with typed result
@@ -212,9 +296,9 @@ class RecallCandidate {
   factory RecallCandidate.fromMap(Map<String, dynamic> map) {
     return RecallCandidate(
       patientId: map['patientId'] ?? map['id'] ?? '',
-      patientName: map['patientName'] ?? map['name'] ?? 'Patient',
+      patientName: map['patientName'] ?? map['name'] ?? map['full_name'] ?? 'Patient',
       phone: map['phone'],
-      lastVisitDate: map['lastVisitDate'] ?? map['lastVisit'],
+      lastVisitDate: map['lastVisitDate'] ?? map['last_visit_date'] ?? map['lastVisit'],
       reason: map['reason'] ?? 'Routine Recall Due',
     );
   }

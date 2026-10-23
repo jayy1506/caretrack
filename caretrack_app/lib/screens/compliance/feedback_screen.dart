@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/custom_button.dart';
 
@@ -44,12 +44,10 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable('submitFeedback');
-      await callable.call({
-        'clinicId': widget.clinicId,
-        'category': _category,
+      await Supabase.instance.client.from('feedback').insert({
+        'clinic_id': widget.clinicId,
         'rating': _rating,
-        'comment': comment,
+        'comment': '[$_category] $comment',
       });
 
       if (mounted) {

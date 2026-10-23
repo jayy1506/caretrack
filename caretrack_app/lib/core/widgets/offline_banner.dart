@@ -19,12 +19,15 @@ class OfflineBanner extends StatelessWidget {
         children: [
           Icon(Icons.wifi_off, size: 16, color: AppTheme.statusWarning),
           SizedBox(width: 8),
-          Text(
-            "You're offline. Some features may be unavailable.",
-            style: TextStyle(
-              color: AppTheme.statusWarning,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+          Expanded(
+            child: Text(
+              "You are offline. Showing cached clinic records. Remote updates are paused until reconnected.",
+              style: TextStyle(
+                color: AppTheme.statusWarning,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
             ),
           ),
         ],

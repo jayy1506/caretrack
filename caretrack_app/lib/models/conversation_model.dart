@@ -34,15 +34,22 @@ class ConversationMessageModel {
       }
     }
 
+    var senderType = map['sender'] ?? 'patient';
+    if (map['direction'] == 'inbound' || map['sender_type'] == 'patient') {
+      senderType = 'patient';
+    } else if (map['direction'] == 'outbound' || map['sender_type'] == 'staff') {
+      senderType = 'clinic';
+    }
+
     return ConversationMessageModel(
-      id: id,
-      sender: map['sender'] ?? 'patient',
-      text: map['text'] ?? '',
-      timestamp: parseDate(map['timestamp']),
+      id: map['id'] ?? id,
+      sender: senderType,
+      text: map['body'] ?? map['text'] ?? '',
+      timestamp: parseDate(map['created_at'] ?? map['timestamp']),
       status: map['status'] ?? 'sent',
       channel: map['channel'] ?? 'whatsapp',
-      isUrgent: map['isUrgent'] ?? false,
-      templateName: map['templateName'],
+      isUrgent: map['is_urgent'] ?? map['isUrgent'] ?? false,
+      templateName: map['template_name'] ?? map['templateName'],
     );
   }
 
@@ -50,10 +57,13 @@ class ConversationMessageModel {
     return {
       'id': id,
       'sender': sender,
+      'body': text,
       'text': text,
+      'created_at': timestamp.toIso8601String(),
       'timestamp': timestamp.toIso8601String(),
       'status': status,
       'channel': channel,
+      'is_urgent': isUrgent,
       'isUrgent': isUrgent,
       if (templateName != null) 'templateName': templateName,
     };
@@ -102,42 +112,52 @@ class ConversationThreadModel {
       if (val is DateTime) return val;
       if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
       try {
-        return val.toDate();
+        return (val as dynamic).toDate();
       } catch (_) {
         return DateTime.now();
       }
     }
 
+    final patientData = map['patients'] is Map ? map['patients'] as Map : null;
+    final resolvedPatientName =
+        patientData?['full_name'] ?? patientData?['name'] ?? map['patientName'] ?? 'Patient';
+    final resolvedPhone =
+        patientData?['phone'] ?? map['phone'] ?? map['patientPhone'] ?? '';
+
     return ConversationThreadModel(
-      id: id,
-      clinicId: map['clinicId'] ?? 'default-clinic',
-      patientId: map['patientId'] ?? id,
-      patientName: map['patientName'] ?? 'Patient',
-      patientPhone: map['patientPhone'] ?? '',
-      lastMessageText: map['lastMessageText'] ?? '',
-      lastMessageAt: parseDate(map['lastMessageAt']),
-      unreadCount: map['unreadCount'] ?? 0,
-      isUrgent: map['isUrgent'] ?? false,
-      assignedStaffId: map['assignedStaffId'],
+      id: map['id'] ?? id,
+      clinicId: map['clinic_id'] ?? map['clinicId'] ?? 'default-clinic',
+      patientId: map['patient_id'] ?? map['patientId'] ?? id,
+      patientName: resolvedPatientName.toString(),
+      patientPhone: resolvedPhone.toString(),
+      lastMessageText: map['last_message_text'] ?? map['lastMessageText'] ?? 'Patient inquiry',
+      lastMessageAt: parseDate(map['last_message_at'] ?? map['lastMessageAt']),
+      unreadCount: map['unread_count'] ?? map['unreadCount'] ?? 0,
+      isUrgent: map['is_urgent'] ?? map['isUrgent'] ?? false,
+      assignedStaffId: map['assigned_to'] ?? map['assignedStaffId'],
       status: map['status'] ?? 'open',
-      lastUserInboundAt: map['lastUserInboundAt'] != null ? parseDate(map['lastUserInboundAt']) : null,
+      lastUserInboundAt: map['last_message_at'] != null ? parseDate(map['last_message_at']) : null,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'clinic_id': clinicId,
       'clinicId': clinicId,
+      'patient_id': patientId,
       'patientId': patientId,
       'patientName': patientName,
       'patientPhone': patientPhone,
+      'last_message_text': lastMessageText,
       'lastMessageText': lastMessageText,
+      'last_message_at': lastMessageAt.toIso8601String(),
       'lastMessageAt': lastMessageAt.toIso8601String(),
       'unreadCount': unreadCount,
+      'is_urgent': isUrgent,
       'isUrgent': isUrgent,
-      if (assignedStaffId != null) 'assignedStaffId': assignedStaffId,
+      if (assignedStaffId != null) 'assigned_to': assignedStaffId,
       'status': status,
-      if (lastUserInboundAt != null) 'lastUserInboundAt': lastUserInboundAt!.toIso8601String(),
     };
   }
 }

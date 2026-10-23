@@ -1,28 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'firebase_options.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/supabase_config.dart';
 import 'core/theme/app_theme.dart';
 import 'services/auth_service.dart';
 import 'services/demo_service.dart';
 import 'services/connectivity_service.dart';
+import 'services/clinic_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/doctor/doctor_shell_screen.dart';
 import 'screens/receptionist/receptionist_shell_screen.dart';
 
-import 'services/clinic_service.dart';
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase with project options
+  // Initialize Supabase using --dart-define parameters with fallback
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+    await Supabase.initialize(
+      url: SupabaseConfig.supabaseUrl,
+      // ignore: deprecated_member_use
+      anonKey: SupabaseConfig.supabaseAnonKey,
     );
   } catch (e) {
-    debugPrint('Firebase initialization notice: $e');
+    debugPrint('Supabase initialization notice: $e');
   }
 
   runApp(
@@ -83,8 +84,8 @@ class AuthGate extends StatelessWidget {
       return const LoginScreen();
     }
 
-    // Role-based routing
-    if (auth.currentUser!.isAdmin) {
+    // Role-based routing: Owner -> Admin shell, Receptionist -> Receptionist shell, Doctor -> Doctor shell
+    if (auth.currentUser!.isAdmin || auth.currentUser!.isOwner) {
       return const AdminDashboardScreen();
     }
     if (auth.currentUser!.isReceptionist) {

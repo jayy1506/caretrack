@@ -152,28 +152,47 @@ class MedicationScheduleModel {
     }
 
     final rawItems = (map['items'] as List<dynamic>?) ?? [];
+    List<MedicationScheduleItemModel> parsedItems = [];
+    if (rawItems.isNotEmpty) {
+      parsedItems = rawItems
+          .map((item) => MedicationScheduleItemModel.fromMap(Map<String, dynamic>.from(item)))
+          .toList();
+    } else if (map['medicine_name'] != null) {
+      parsedItems = [
+        MedicationScheduleItemModel(
+          medicineName: map['medicine_name'] ?? '',
+          dosage: map['dosage'] ?? '',
+          frequency: map['timing'] ?? 'Daily',
+          durationDays: 7,
+          instructions: '',
+          timing: [map['timing'] ?? 'morning'],
+        )
+      ];
+    }
+
+    final activeFlag = map['is_active'];
+    final derivedStatus = (activeFlag == true) ? 'active' : (activeFlag == false ? 'completed' : (map['status'] ?? 'active'));
+
     return MedicationScheduleModel(
-      id: id,
-      clinicId: map['clinicId'] ?? 'default-clinic',
-      patientId: map['patientId'] ?? '',
-      doctorId: map['doctorId'] ?? '',
-      prescriptionId: map['prescriptionId'] ?? '',
-      status: map['status'] ?? 'draft',
-      startDate: map['startDate'] ?? '',
-      endDate: map['endDate'] ?? '',
+      id: map['id'] ?? id,
+      clinicId: map['clinic_id'] ?? map['clinicId'] ?? 'default-clinic',
+      patientId: map['patient_id'] ?? map['patientId'] ?? '',
+      doctorId: map['doctor_id'] ?? map['doctorId'] ?? '',
+      prescriptionId: map['prescription_id'] ?? map['prescriptionId'] ?? '',
+      status: derivedStatus,
+      startDate: (map['start_date'] ?? map['startDate'] ?? '').toString(),
+      endDate: (map['end_date'] ?? map['endDate'] ?? '').toString(),
       timeWindows: MedicationTimeWindowsModel.fromMap(
         map['timeWindows'] != null ? Map<String, dynamic>.from(map['timeWindows']) : {},
       ),
-      items: rawItems
-          .map((item) => MedicationScheduleItemModel.fromMap(Map<String, dynamic>.from(item)))
-          .toList(),
+      items: parsedItems,
       adherence: MedicationAdherenceModel.fromMap(
         map['adherence'] != null ? Map<String, dynamic>.from(map['adherence']) : {},
       ),
-      doctorConfirmed: map['doctorConfirmed'] ?? false,
+      doctorConfirmed: map['doctorConfirmed'] ?? true,
       confirmedAt: map['confirmedAt'] != null ? parseDate(map['confirmedAt']) : null,
-      createdAt: parseDate(map['createdAt']),
-      updatedAt: parseDate(map['updatedAt']),
+      createdAt: parseDate(map['created_at'] ?? map['createdAt']),
+      updatedAt: parseDate(map['updated_at'] ?? map['updatedAt']),
     );
   }
 

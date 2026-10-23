@@ -67,16 +67,17 @@ class ClinicModel {
   });
 
   factory ClinicModel.fromMap(Map<String, dynamic> map, String id) {
+    final settings = map['settings'] is Map ? map['settings'] as Map<String, dynamic> : null;
     return ClinicModel(
-      id: id,
+      id: map['id'] ?? id,
       name: map['name'] ?? 'CareTrack Clinic',
-      address: map['address'] ?? '',
-      phone: map['phone'] ?? '',
+      address: map['address'] ?? settings?['address'] ?? '',
+      phone: map['phone'] ?? settings?['phone'] ?? '',
       timezone: map['timezone'] ?? 'Asia/Kolkata',
-      workingHours: Map<String, dynamic>.from(map['workingHours'] ?? {}),
-      holidays: List<String>.from(map['holidays'] ?? []),
-      logoUrl: map['logoUrl'],
-      featureFlags: ClinicFeatureFlags.fromMap(map['featureFlags']),
+      workingHours: Map<String, dynamic>.from(settings?['working_hours'] ?? map['workingHours'] ?? {}),
+      holidays: List<String>.from(settings?['holidays'] ?? map['holidays'] ?? []),
+      logoUrl: map['logo_url'] ?? map['logoUrl'],
+      featureFlags: ClinicFeatureFlags.fromMap(settings?['feature_flags'] ?? map['featureFlags']),
     );
   }
 

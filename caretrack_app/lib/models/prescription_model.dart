@@ -83,36 +83,48 @@ class PrescriptionModel {
     }
 
     return PrescriptionModel(
-      id: id,
-      clinicId: map['clinicId'] ?? 'default-clinic',
-      doctorId: map['doctorId'] ?? '',
-      patientId: map['patientId'] ?? '',
-      prescriptionDate: map['prescriptionDate'] ?? '',
+      id: map['id'] ?? id,
+      clinicId: map['clinic_id'] ?? map['clinicId'] ?? 'default-clinic',
+      doctorId: map['doctor_id'] ?? map['doctorId'] ?? '',
+      patientId: map['patient_id'] ?? map['patientId'] ?? '',
+      prescriptionDate: map['prescription_date'] ??
+          map['prescriptionDate'] ??
+          (map['created_at'] != null ? map['created_at'].toString().split('T')[0] : ''),
       source: map['source'] ?? 'manual',
-      originalFileUrl: map['originalFileUrl'],
+      originalFileUrl: map['original_file_url'] ?? map['originalFileUrl'],
       medicines: parsedMedicines,
-      followUpType: map['followUpType'] ?? '3_months',
-      followUpDate: map['followUpDate'] ?? '',
-      aiExtracted: map['aiExtracted'] ?? false,
-      doctorConfirmed: map['doctorConfirmed'] ?? true,
-      createdAt: parseDate(map['createdAt']),
+      followUpType: map['follow_up_type'] ?? map['followUpType'] ?? '3_months',
+      followUpDate: (map['follow_up_date'] ?? map['followUpDate'] ?? '').toString(),
+      aiExtracted: map['ai_extracted'] ?? map['aiExtracted'] ?? false,
+      doctorConfirmed: map['verified_at'] != null || map['doctorConfirmed'] == true,
+      createdAt: parseDate(map['created_at'] ?? map['createdAt']),
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'clinic_id': clinicId,
       'clinicId': clinicId,
+      'doctor_id': doctorId,
       'doctorId': doctorId,
+      'patient_id': patientId,
       'patientId': patientId,
+      'prescription_date': prescriptionDate,
       'prescriptionDate': prescriptionDate,
       'source': source,
+      'original_file_url': originalFileUrl,
       'originalFileUrl': originalFileUrl,
       'medicines': medicines.map((m) => m.toMap()).toList(),
+      'follow_up_type': followUpType,
       'followUpType': followUpType,
+      'follow_up_date': followUpDate,
       'followUpDate': followUpDate,
+      'ai_extracted': aiExtracted,
       'aiExtracted': aiExtracted,
+      'verified_at': doctorConfirmed ? createdAt.toIso8601String() : null,
       'doctorConfirmed': doctorConfirmed,
+      'created_at': createdAt.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
     };
   }

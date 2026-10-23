@@ -5,14 +5,14 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/notification_model.dart';
 import 'offline_store.dart';
 import 'local_storage_adapter.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/supabase_config.dart';
 
 class CommsSenderService {
   static final CommsSenderService _instance = CommsSenderService._internal();
   factory CommsSenderService() => _instance;
   CommsSenderService._internal();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final _supabase = SupabaseConfig.client;
 
   // Email & Clinic metadata
   static const String clinicEmailName = 'CareTrack Clinic';
@@ -530,6 +530,6 @@ class CommsSenderService {
     );
 
     OfflineStore().addNotification(notif);
-    _firestore.collection('notifications').doc(notif.id).set(notif.toMap()).catchError((_) {});
+    _supabase.from('notifications').insert(notif.toMap()).catchError((_) {});
   }
 }

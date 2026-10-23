@@ -61,37 +61,42 @@ class NotificationModel {
     }
 
     return NotificationModel(
-      id: id,
-      clinicId: map['clinicId'] ?? 'default-clinic',
-      doctorId: map['doctorId'] ?? '',
-      patientId: map['patientId'],
-      appointmentId: map['appointmentId'],
-      channel: map['channel'] ?? 'email',
+      id: map['id'] ?? id,
+      clinicId: map['clinic_id'] ?? map['clinicId'] ?? 'default-clinic',
+      doctorId: map['doctor_id'] ?? map['doctorId'] ?? '',
+      patientId: map['patient_id'] ?? map['patientId'],
+      appointmentId: map['appointment_id'] ?? map['appointmentId'],
+      channel: map['channel'] ?? 'whatsapp',
       type: map['type'] ?? 'appointment_reminder',
-      recipient: map['recipient'] ?? '',
+      recipient: map['recipient_masked'] ?? map['recipient'] ?? '',
       status: map['status'] ?? 'Pending',
-      providerMessageId: map['providerMessageId'],
+      providerMessageId: map['provider_message_id'] ?? map['providerMessageId'],
       error: map['error'],
-      sentAt: map['sentAt'] != null ? parseDate(map['sentAt']) : null,
-      createdAt: parseDate(map['createdAt']),
+      sentAt: map['sentAt'] != null ? parseDate(map['sentAt']) : (map['status'] == 'sent' ? parseDate(map['created_at']) : null),
+      createdAt: parseDate(map['created_at'] ?? map['createdAt']),
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'clinic_id': clinicId,
       'clinicId': clinicId,
+      'doctor_id': doctorId,
       'doctorId': doctorId,
+      'patient_id': patientId,
       'patientId': patientId,
+      'appointment_id': appointmentId,
       'appointmentId': appointmentId,
       'channel': channel,
       'type': type,
       'recipient': recipient,
+      'recipient_masked': recipient,
       'status': status,
+      'provider_message_id': providerMessageId,
       'providerMessageId': providerMessageId,
       'error': error,
-      'sentAt': sentAt?.toIso8601String(),
-      'createdAt': createdAt.toIso8601String(),
+      'created_at': createdAt.toIso8601String(),
     };
   }
 }

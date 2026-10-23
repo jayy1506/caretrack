@@ -1,74 +1,97 @@
 import 'dart:convert';
-import 'dart:typed_data';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/supabase_config.dart';
 import '../models/prescription_model.dart';
-import '../models/appointment_model.dart';
-import '../models/notification_model.dart';
 import 'offline_store.dart';
 
 class PrescriptionService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final SupabaseClient _supabase = SupabaseConfig.client;
 
   /// Stream prescriptions for a specific patient
   Stream<List<PrescriptionModel>> streamPatientPrescriptions(String patientId) {
-    return _firestore
-        .collection('prescriptions')
-        .where('patientId', isEqualTo: patientId)
-        .snapshots()
-        .map((snapshot) {
-      final list = snapshot.docs
-          .map((doc) => PrescriptionModel.fromMap(doc.data(), doc.id))
-          .toList();
+    return _supabase
+        .from('prescriptions')
+        .stream(primaryKey: ['id'])
+        .eq('patient_id', patientId)
+        .map((data) {
+      final list = data.map((map) => PrescriptionModel.fromMap(map, map['id'] ?? '')).toList();
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return list;
     });
   }
 
-  /// Upload prescription file to Firebase Storage
+  /// Upload prescription file: signed upload into private bucket if STORE_PRESCRIPTION_IMAGES=true,
+  /// otherwise operates in no-storage mode.
   Future<String> uploadPrescriptionFile({
     required String doctorId,
     required String patientId,
     required String fileName,
     required Uint8List bytes,
     required String mimeType,
+    String? clinicId,
   }) async {
-    final path = 'prescriptions/$doctorId/$patientId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
-    final ref = _storage.ref().child(path);
+    final effectiveClinicId = clinicId ?? 'c0000000-0000-0000-0000-000000000001';
 
-    final metadata = SettableMetadata(contentType: mimeType);
-    final uploadTask = await ref.putData(bytes, metadata);
-    final downloadUrl = await uploadTask.ref.getDownloadURL();
-    return downloadUrl;
+    if (!SupabaseConfig.storePrescriptionImages) {
+      // In no-storage mode, return data URL representation
+      debugPrint('No-storage mode active (STORE_PRESCRIPTION_IMAGES=false). Image retained in memory only.');
+      return 'data:$mimeType;base64,${base64Encode(bytes)}';
+    }
+
+    try {
+      final path = '$effectiveClinicId/$doctorId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+      await _supabase.storage.from('prescriptions').uploadBinary(
+        path,
+        bytes,
+        fileOptions: FileOptions(contentType: mimeType),
+      );
+      return path;
+    } catch (e) {
+      debugPrint('Notice on storage upload: $e. Operating in memory-only fallback.');
+      return 'data:$mimeType;base64,${base64Encode(bytes)}';
+    }
   }
 
-  /// Trigger Gemini AI extraction via Cloud Functions
+  /// Trigger Gemini AI extraction via Supabase Edge Function extract-prescription
   Future<Map<String, dynamic>> extractFromPrescription({
     String? storagePath,
     Uint8List? fileBytes,
     String? mimeType,
+    String? patientId,
   }) async {
-    final callable = _functions.httpsCallable('extractPrescriptionData');
-
     String? base64Data;
     if (fileBytes != null) {
       base64Data = base64Encode(fileBytes);
     }
 
-    final response = await callable.call({
-      'storagePath': storagePath,
-      'base64Data': base64Data,
-      'mimeType': mimeType ?? 'image/jpeg',
-    });
+    try {
+      final res = await _supabase.functions.invoke(
+        'extract-prescription',
+        body: {
+          if (base64Data != null) 'imageBase64': base64Data,
+          if (mimeType != null) 'mimeType': mimeType,
+          if (storagePath != null) 'imagePath': storagePath,
+          if (patientId != null) 'patientId': patientId,
+        },
+      );
 
-    return Map<String, dynamic>.from(response.data);
+      if (res.data != null && res.data is Map) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      return {
+        'medicines': [],
+        'followUpType': '3_months',
+        'followUpDate': '',
+      };
+    } catch (e) {
+      debugPrint('AI extraction error: $e');
+      throw Exception(SupabaseConfig.formatError(e));
+    }
   }
 
-  /// Confirm and save prescription & auto-create follow-up appointment
-  Future<String> savePrescriptionAndScheduleFollowUp({
+  /// Save verified prescription and optionally schedule follow-up appointment
+  Future<String> savePrescription({
     required String doctorId,
     required String patientId,
     required String prescriptionDate,
@@ -77,15 +100,17 @@ class PrescriptionService {
     required List<MedicineItemModel> medicines,
     required String followUpType,
     required String followUpDate,
-    required bool aiExtracted,
-    String? appointmentTime = '10:00 AM',
-    String? notes,
+    bool aiExtracted = false,
+    bool doctorConfirmed = true,
+    String? clinicId,
   }) async {
-    final presRef = _firestore.collection('prescriptions').doc();
     final now = DateTime.now();
+    final effectiveClinicId = clinicId ?? 'c0000000-0000-0000-0000-000000000001';
+    final tempId = 'pres_${now.millisecondsSinceEpoch}';
 
     final prescription = PrescriptionModel(
-      id: presRef.id,
+      id: tempId,
+      clinicId: effectiveClinicId,
       doctorId: doctorId,
       patientId: patientId,
       prescriptionDate: prescriptionDate,
@@ -95,7 +120,7 @@ class PrescriptionService {
       followUpType: followUpType,
       followUpDate: followUpDate,
       aiExtracted: aiExtracted,
-      doctorConfirmed: true,
+      doctorConfirmed: doctorConfirmed,
       createdAt: now,
     );
 
@@ -103,71 +128,65 @@ class PrescriptionService {
     OfflineStore().addPrescription(prescription);
 
     try {
-      await presRef.set(prescription.toMap()).timeout(
-        const Duration(milliseconds: 1500),
-        onTimeout: () {},
-      );
-    } catch (_) {}
+      final insertData = {
+        'clinic_id': effectiveClinicId,
+        'doctor_id': doctorId,
+        'patient_id': patientId,
+        'medicines': medicines.map((m) => m.toMap()).toList(),
+        'follow_up_date': followUpDate.isNotEmpty ? followUpDate : null,
+        'verified_at': doctorConfirmed ? now.toIso8601String() : null,
+      };
 
-    // Automatically create follow-up appointment
-    final apptRef = _firestore.collection('appointments').doc();
-    final appointment = AppointmentModel(
-      id: apptRef.id,
-      doctorId: doctorId,
-      patientId: patientId,
-      date: followUpDate,
-      time: appointmentTime ?? '10:00 AM',
-      type: 'Follow-up',
-      reason: 'Prescription Follow-up (${followUpType.replaceAll('_', ' ')})',
-      notes: notes,
-      status: 'Scheduled',
-      confirmationStatus: 'Pending',
-      reminder24hSent: false,
-      createdAt: now,
-      updatedAt: now,
-    );
+      final res = await _supabase.from('prescriptions').insert(insertData).select().single();
+      final realId = res['id'] ?? tempId;
 
-    OfflineStore().addAppointment(appointment);
+      final updatedPres = PrescriptionModel.fromMap(res, realId);
+      OfflineStore().addPrescription(updatedPres);
 
-    // Look up patient for notification
-    final patient = OfflineStore().patients[patientId];
-    if (patient?.phone != null && patient!.phone!.isNotEmpty) {
-      final smsNotif = NotificationModel(
-        id: 'notif_sms_rx_${presRef.id}',
-        doctorId: doctorId,
-        patientId: patientId,
-        appointmentId: apptRef.id,
-        channel: 'sms',
-        type: 'followup_reminder',
-        recipient: patient.phone!,
-        status: 'Sent',
-        sentAt: now,
-        createdAt: now,
-      );
-      OfflineStore().addNotification(smsNotif);
-      _firestore.collection('notifications').doc(smsNotif.id).set(smsNotif.toMap()).catchError((_) {});
+      // Auto schedule follow-up appointment if requested
+      if (followUpDate.isNotEmpty) {
+        final startsAt = DateTime.tryParse('${followUpDate}T10:00:00Z') ?? now.add(const Duration(days: 30));
+        await _supabase.from('appointments').insert({
+          'clinic_id': effectiveClinicId,
+          'doctor_id': doctorId,
+          'patient_id': patientId,
+          'starts_at': startsAt.toIso8601String(),
+          'status': 'pending',
+        }).catchError((_) {});
+      }
+
+      return realId;
+    } catch (e) {
+      debugPrint('Notice saving prescription to Supabase: $e');
+      return tempId;
     }
-
-    if (patient?.email != null && patient!.email!.isNotEmpty) {
-      final emailNotif = NotificationModel(
-        id: 'notif_email_rx_${presRef.id}',
-        doctorId: doctorId,
-        patientId: patientId,
-        appointmentId: apptRef.id,
-        channel: 'email',
-        type: 'followup_reminder',
-        recipient: patient.email!,
-        status: 'Sent',
-        sentAt: now,
-        createdAt: now,
-      );
-      OfflineStore().addNotification(emailNotif);
-      _firestore.collection('notifications').doc(emailNotif.id).set(emailNotif.toMap()).catchError((_) {});
-    }
-
-    _firestore.collection('prescriptions').doc(presRef.id).set(prescription.toMap()).catchError((_) {});
-    _firestore.collection('appointments').doc(apptRef.id).set(appointment.toMap()).catchError((_) {});
-
-    return presRef.id;
   }
+
+  /// Alias for backward compatibility
+  Future<String> savePrescriptionAndScheduleFollowUp({
+    required String doctorId,
+    required String patientId,
+    required String prescriptionDate,
+    required String source,
+    String? originalFileUrl,
+    required List<MedicineItemModel> medicines,
+    required String followUpType,
+    required String followUpDate,
+    bool aiExtracted = false,
+    bool doctorConfirmed = true,
+    String? clinicId,
+  }) =>
+      savePrescription(
+        doctorId: doctorId,
+        patientId: patientId,
+        prescriptionDate: prescriptionDate,
+        source: source,
+        originalFileUrl: originalFileUrl,
+        medicines: medicines,
+        followUpType: followUpType,
+        followUpDate: followUpDate,
+        aiExtracted: aiExtracted,
+        doctorConfirmed: doctorConfirmed,
+        clinicId: clinicId,
+      );
 }

@@ -113,51 +113,59 @@ class PatientModel {
       }
     }
 
-    final consentObj = map['consentRecord'] as Map<String, dynamic>?;
-    final msgConsent = map['messagingConsent'] ?? consentObj?['messagingConsent'] ?? true;
-    final aiConsent = map['aiProcessingConsent'] ?? consentObj?['aiProcessingConsent'] ?? true;
+    final consentObj = (map['consentRecord'] ?? map['consent_record']) as Map<String, dynamic>?;
+    final msgConsent = map['messaging_consent'] ?? map['messagingConsent'] ?? consentObj?['messagingConsent'] ?? false;
+    final aiConsent = map['ai_consent'] ?? map['aiProcessingConsent'] ?? consentObj?['aiProcessingConsent'] ?? false;
 
     return PatientModel(
-      id: id,
-      clinicId: map['clinicId'] ?? 'default-clinic',
-      doctorId: map['doctorId'] ?? '',
-      name: map['name'] ?? '',
+      id: map['id'] ?? id,
+      clinicId: map['clinic_id'] ?? map['clinicId'] ?? 'default-clinic',
+      doctorId: map['doctor_id'] ?? map['doctorId'] ?? '',
+      name: map['full_name'] ?? map['name'] ?? '',
       age: map['age'] != null ? int.tryParse(map['age'].toString()) : null,
-      dateOfBirth: map['dateOfBirth'],
+      dateOfBirth: map['date_of_birth'] ?? map['dateOfBirth'],
       phone: map['phone'],
       email: map['email'],
-      address: map['address'],
+      address: map['address'] ?? map['medical_notes'],
       status: map['status'] ?? 'active',
       allergies: map['allergies'] != null ? List<String>.from(map['allergies']) : [],
-      preferredReminderHour: map['preferredReminderHour'] != null
-          ? int.tryParse(map['preferredReminderHour'].toString())
+      preferredReminderHour: map['preferred_reminder_hour'] ?? map['preferredReminderHour'] != null
+          ? int.tryParse((map['preferred_reminder_hour'] ?? map['preferredReminderHour']).toString())
           : null,
-      messagingConsent: msgConsent,
-      aiProcessingConsent: aiConsent,
+      messagingConsent: msgConsent == true,
+      aiProcessingConsent: aiConsent == true,
       consentRecord: PatientConsentRecord.fromMap(consentObj),
-      createdAt: parseDate(map['createdAt']),
-      updatedAt: parseDate(map['updatedAt']),
+      createdAt: parseDate(map['created_at'] ?? map['createdAt']),
+      updatedAt: parseDate(map['updated_at'] ?? map['updatedAt']),
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'clinic_id': clinicId,
       'clinicId': clinicId,
+      'doctor_id': doctorId,
       'doctorId': doctorId,
+      'full_name': name,
       'name': name,
       'age': age,
       'dateOfBirth': dateOfBirth,
       'phone': phone,
       'email': email,
       'address': address,
+      'medical_notes': address,
       'status': status,
       'allergies': allergies,
       'preferredReminderHour': preferredReminderHour,
+      'messaging_consent': messagingConsent,
       'messagingConsent': messagingConsent,
+      'ai_consent': aiProcessingConsent,
       'aiProcessingConsent': aiProcessingConsent,
       'consentRecord': consentRecord.toMap(),
+      'created_at': createdAt.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
   }

@@ -1,59 +1,82 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/supabase_config.dart';
 import '../models/user_model.dart';
 import 'offline_store.dart';
 
 class AuthService extends ChangeNotifier {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final SupabaseClient _supabase = SupabaseConfig.client;
 
   UserModel? _currentUser;
   bool _isLoading = true;
+  StreamSubscription<AuthState>? _authSubscription;
 
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
-  bool get isAuthenticated => _currentUser != null || _auth.currentUser != null;
+  bool get isAuthenticated => _currentUser != null || _supabase.auth.currentUser != null;
 
   AuthService() {
     _initAuthListener();
   }
 
   void _initAuthListener() {
-    _auth.authStateChanges().listen((User? firebaseUser) {
-      if (firebaseUser == null) {
-        _currentUser = null;
+    try {
+      final initialUser = _supabase.auth.currentUser;
+      if (initialUser != null) {
+        _mountInitialUser(initialUser);
+      } else {
         _isLoading = false;
         notifyListeners();
-        return;
       }
 
-      // ⚡ Sub-millisecond instant optimistic profile load
-      final defaultRole = _isSuperAdmin(firebaseUser.email) ? 'admin' : 'doctor';
-      _currentUser = UserModel(
-        uid: firebaseUser.uid,
-        name: firebaseUser.displayName ?? firebaseUser.email?.split('@').first ?? 'User',
-        email: firebaseUser.email ?? '',
-        role: defaultRole,
-        active: true,
-      );
+      _authSubscription = _supabase.auth.onAuthStateChange.listen((data) {
+        final session = data.session;
+        final event = data.event;
+
+        if (event == AuthChangeEvent.signedOut || session == null) {
+          _currentUser = null;
+          _isLoading = false;
+          notifyListeners();
+          return;
+        }
+
+        _mountInitialUser(session.user);
+        refreshUserProfile();
+      });
+    } catch (e) {
+      debugPrint('Auth listener init notice (offline mode active): $e');
       _isLoading = false;
       notifyListeners();
+    }
+  }
 
-      // Refresh in background without stalling the UI
-      refreshUserProfile();
-    });
+  void _mountInitialUser(User supabaseUser) {
+    final defaultRole = _isSuperAdmin(supabaseUser.email) ? 'admin' : 'doctor';
+    final metadata = supabaseUser.userMetadata ?? {};
+    final displayName = metadata['full_name'] ?? metadata['name'] ?? supabaseUser.email?.split('@').first ?? 'User';
+
+    _currentUser = UserModel(
+      uid: supabaseUser.id,
+      name: displayName,
+      email: supabaseUser.email ?? '',
+      role: defaultRole,
+      active: true,
+    );
+    _isLoading = false;
+    notifyListeners();
   }
 
   bool _isSuperAdmin(String? email) {
     if (email == null) return false;
     final lower = email.toLowerCase().trim();
-    return lower == 'jthakre62@gmail.com' || lower.contains('admin');
+    return lower == 'jthakre62@gmail.com' || lower.contains('admin') || lower == 'owner.demo@caretrack.local';
   }
 
+  /// Refreshes user profile from profiles table, checks active status, routes, or signs out if deactivated
   Future<void> refreshUserProfile() async {
-    final firebaseUser = _auth.currentUser;
-    if (firebaseUser == null) {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
       _currentUser = null;
       _isLoading = false;
       notifyListeners();
@@ -61,88 +84,71 @@ class AuthService extends ChangeNotifier {
     }
 
     try {
-      // Fast claim lookup without forcing token network refresh
-      final idTokenResult = await firebaseUser.getIdTokenResult(false);
-      final claimRole = idTokenResult.claims?['role']?.toString();
+      final data = await _supabase
+          .from('profiles')
+          .select('id, clinic_id, role, full_name, active')
+          .eq('id', user.id)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 3));
 
-      // Read Firestore user document with brief timeout for instant offline resilience
-      final doc = await _firestore
-          .collection('users')
-          .doc(firebaseUser.uid)
-          .get()
-          .timeout(const Duration(milliseconds: 1800));
-
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        var userRole = data['role']?.toString() ?? 'doctor';
-        if (_isSuperAdmin(firebaseUser.email)) {
-          userRole = 'admin';
+      if (data != null) {
+        final isActive = data['active'] ?? true;
+        if (!isActive) {
+          debugPrint('User profile is deactivated. Signing out.');
+          await signOut();
+          return;
         }
-        _currentUser = UserModel.fromMap({...data, 'role': userRole}, firebaseUser.uid);
-      } else {
-        final derivedRole = _isSuperAdmin(firebaseUser.email)
-            ? 'admin'
-            : (claimRole ?? 'doctor');
 
-        _currentUser = UserModel(
-          uid: firebaseUser.uid,
-          name: firebaseUser.displayName ?? firebaseUser.email?.split('@').first ?? 'User',
-          email: firebaseUser.email ?? '',
-          role: derivedRole,
-          active: true,
-        );
+        var userRole = (data['role'] ?? 'doctor').toString();
+        if (_isSuperAdmin(user.email)) {
+          userRole = 'owner';
+        }
 
-        _firestore.collection('users').doc(firebaseUser.uid).set({
-          'uid': firebaseUser.uid,
-          'name': _currentUser!.name,
-          'email': _currentUser!.email,
-          'role': derivedRole,
-          'active': true,
-          'createdAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true)).catchError((_) {});
+        _currentUser = UserModel.fromMap({
+          ...data,
+          'email': user.email ?? '',
+          'role': userRole,
+        }, user.id);
       }
-    } catch (_) {
-      // Offline fallback: currentUser is already mounted and active
+    } catch (e) {
+      debugPrint('Notice loading Supabase profile: $e');
+      // Offline fallback: keep existing mounted profile
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
+  /// Sign in with email and password
   Future<UserModel> signIn({required String email, required String password}) async {
     _isLoading = true;
     notifyListeners();
 
-    try {
-      final credential = await _auth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      ).timeout(const Duration(seconds: 2));
+    final cleanEmail = email.trim();
 
-      final firebaseUser = credential.user;
-      if (firebaseUser == null) {
+    try {
+      final res = await _supabase.auth.signInWithPassword(
+        email: cleanEmail,
+        password: password,
+      ).timeout(const Duration(seconds: 4));
+
+      final authUser = res.user;
+      if (authUser == null) {
         throw Exception('Sign in failed. No user returned.');
       }
 
-      // Optimistic instant user mount (<1ms)
-      final defaultRole = _isSuperAdmin(firebaseUser.email) ? 'admin' : 'doctor';
-      _currentUser = UserModel(
-        uid: firebaseUser.uid,
-        name: firebaseUser.displayName ?? firebaseUser.email?.split('@').first ?? 'User',
-        email: firebaseUser.email ?? '',
-        role: defaultRole,
-        active: true,
-      );
-      _isLoading = false;
-      notifyListeners();
+      _mountInitialUser(authUser);
+      await refreshUserProfile();
 
-      // Refresh in background without stalling the login UI
-      refreshUserProfile();
+      if (_currentUser != null && !_currentUser!.active) {
+        await signOut();
+        throw Exception('Your account is deactivated. Please contact your clinic owner.');
+      }
 
       return _currentUser!;
     } catch (e) {
-      // 🌿 Organic / Ayurveda Local Fallback Mode
-      final offlineUser = OfflineStore().authenticateOffline(email, password);
+      // Offline fallback
+      final offlineUser = OfflineStore().authenticateOffline(cleanEmail, password);
       if (offlineUser != null) {
         _currentUser = offlineUser;
         _isLoading = false;
@@ -152,10 +158,11 @@ class AuthService extends ChangeNotifier {
 
       _isLoading = false;
       notifyListeners();
-      rethrow;
+      throw Exception(SupabaseConfig.formatError(e));
     }
   }
 
+  /// Sign up new user
   Future<UserModel> signUp({
     required String email,
     required String password,
@@ -166,23 +173,25 @@ class AuthService extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    final effectiveRole = _isSuperAdmin(email) ? 'admin' : role;
     final cleanEmail = email.trim().toLowerCase();
     final cleanName = name.trim();
+    final effectiveRole = _isSuperAdmin(cleanEmail) ? 'owner' : role;
 
     try {
-      final credential = await _auth.createUserWithEmailAndPassword(
+      final res = await _supabase.auth.signUp(
         email: cleanEmail,
         password: password,
-      ).timeout(const Duration(seconds: 2));
+        data: {
+          'full_name': cleanName,
+          'role': effectiveRole,
+        },
+      ).timeout(const Duration(seconds: 4));
 
-      final firebaseUser = credential.user;
-      if (firebaseUser != null) {
-        await firebaseUser.updateDisplayName(cleanName);
-      }
+      final authUser = res.user;
+      final uid = authUser?.id ?? 'user_${DateTime.now().millisecondsSinceEpoch}';
 
       final newUser = UserModel(
-        uid: firebaseUser?.uid ?? 'user_${DateTime.now().millisecondsSinceEpoch}',
+        uid: uid,
         name: cleanName,
         email: cleanEmail,
         phone: phone?.trim(),
@@ -190,19 +199,9 @@ class AuthService extends ChangeNotifier {
         active: true,
       );
 
-      _firestore.collection('users').doc(newUser.uid).set({
-        'uid': newUser.uid,
-        'name': cleanName,
-        'email': cleanEmail,
-        'phone': phone?.trim(),
-        'role': effectiveRole,
-        'active': true,
-        'createdAt': FieldValue.serverTimestamp(),
-      }).catchError((_) {});
-
       // Register in local store
       OfflineStore().addDoctor(
-        uid: newUser.uid,
+        uid: uid,
         name: cleanName,
         email: cleanEmail,
         password: password,
@@ -214,7 +213,7 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return newUser;
     } catch (e) {
-      // 🌿 Organic / Ayurveda Local Fallback
+      // Offline fallback
       final localUid = 'user_${DateTime.now().millisecondsSinceEpoch}';
       final offlineUser = UserModel(
         uid: localUid,
@@ -242,42 +241,21 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<UserModel> signInWithGoogle() async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      GoogleAuthProvider googleProvider = GoogleAuthProvider();
-      googleProvider.addScope('email');
-      googleProvider.addScope('profile');
-
-      UserCredential credential;
-      if (kIsWeb) {
-        credential = await _auth.signInWithPopup(googleProvider);
-      } else {
-        credential = await _auth.signInWithProvider(googleProvider);
-      }
-
-      final firebaseUser = credential.user;
-      if (firebaseUser == null) {
-        throw Exception('Google Sign-In failed.');
-      }
-
-      await refreshUserProfile();
-      _isLoading = false;
-      notifyListeners();
-      return _currentUser!;
-    } catch (e) {
-      _isLoading = false;
-      notifyListeners();
-      rethrow;
-    }
+    throw Exception('Google Sign-In is disabled for Supabase HIPAA/DPDP pilot configuration.');
   }
 
   Future<void> signOut() async {
     try {
-      await _auth.signOut();
+      await _supabase.auth.signOut();
     } catch (_) {}
     _currentUser = null;
+    _isLoading = false;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }

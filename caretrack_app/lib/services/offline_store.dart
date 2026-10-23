@@ -26,6 +26,22 @@ class OfflineStore {
   final Map<String, PrescriptionModel> prescriptions = {};
   final List<NotificationModel> notifications = [];
 
+  Map<String, int> _dashboardCounters = {
+    'today': 0,
+    'in_3_days': 0,
+    'in_7_days': 0,
+    'overdue': 0,
+  };
+
+  Map<String, int> get dashboardCounters => Map.unmodifiable(_dashboardCounters);
+
+  void setDashboardCounters(Map<String, int> val) {
+    _dashboardCounters = Map.from(val);
+    try {
+      LocalStorageAdapter.setItem('caretrack_dashboard_counters', jsonEncode(_dashboardCounters));
+    } catch (_) {}
+  }
+
   // Stream controllers for real-time local updates
   final _patientsController = StreamController<List<PatientModel>>.broadcast();
   final _doctorsController = StreamController<List<UserModel>>.broadcast();
@@ -212,6 +228,15 @@ class OfflineStore {
           if (item['password'] != null) {
             userPasswords[u.email.toLowerCase()] = item['password'].toString();
           }
+        }
+      }
+
+      // 5. Load Cached Dashboard Counters
+      final rawCounters = LocalStorageAdapter.getItem('caretrack_dashboard_counters');
+      if (rawCounters != null && rawCounters.isNotEmpty) {
+        final decoded = jsonDecode(rawCounters);
+        if (decoded is Map) {
+          _dashboardCounters = decoded.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
         }
       }
     } catch (_) {}

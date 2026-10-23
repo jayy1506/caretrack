@@ -1,13 +1,59 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/supabase_config.dart';
 import '../models/appointment_model.dart';
-import '../models/notification_model.dart';
 import 'offline_store.dart';
 
 class AppointmentService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final SupabaseClient _supabase = SupabaseConfig.client;
+
+  /// Fetch live or cached dashboard counters using the SQL RPC dashboard_counters()
+  Future<Map<String, int>> getDashboardCounters() async {
+    try {
+      final res = await _supabase.rpc('dashboard_counters');
+      if (res != null && res is Map) {
+        final counters = {
+          'today': (res['today'] as num?)?.toInt() ?? 0,
+          'in_3_days': (res['in_3_days'] as num?)?.toInt() ?? 0,
+          'in_7_days': (res['in_7_days'] as num?)?.toInt() ?? 0,
+          'overdue': (res['overdue'] as num?)?.toInt() ?? 0,
+        };
+        OfflineStore().setDashboardCounters(counters);
+        return counters;
+      }
+    } catch (e) {
+      debugPrint('Notice loading dashboard counters from RPC (using offline cache): $e');
+    }
+    return OfflineStore().dashboardCounters;
+  }
+
+  /// Helper to convert date string (YYYY-MM-DD) and time string (e.g. "10:00 AM") to UTC DateTime
+  DateTime _combineDateAndTime(String dateStr, String timeStr) {
+    try {
+      final dateParts = dateStr.split('-');
+      final year = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final day = int.parse(dateParts[2]);
+
+      final cleanTime = timeStr.trim();
+      final isPM = cleanTime.toUpperCase().contains('PM');
+      final isAM = cleanTime.toUpperCase().contains('AM');
+      final rawTime = cleanTime.replaceAll(RegExp(r'[AaPp][Mm]'), '').trim();
+      final timeParts = rawTime.split(':');
+      var hour = int.parse(timeParts[0]);
+      final minute = timeParts.length > 1 ? int.parse(timeParts[1]) : 0;
+
+      if (isPM && hour < 12) hour += 12;
+      if (isAM && hour == 12) hour = 0;
+
+      // Assume clinic time zone Asia/Kolkata (UTC +05:30)
+      final local = DateTime(year, month, day, hour, minute);
+      return local.subtract(const Duration(hours: 5, minutes: 30)).toUtc();
+    } catch (_) {
+      return DateTime.now().add(const Duration(days: 1)).toUtc();
+    }
+  }
 
   /// Stream all appointments for a doctor with instant offline fallback
   Stream<List<AppointmentModel>> streamDoctorAppointments(String doctorId) {
@@ -21,17 +67,18 @@ class AppointmentService {
       controller.add(OfflineStore().getDoctorAppointments(doctorId));
     });
 
-    // 3. Listen to Firestore stream in background if online
+    // 3. Listen to Supabase stream in background if online
     StreamSubscription? subRemote;
     try {
-      subRemote = _firestore
-          .collection('appointments')
-          .where('doctorId', isEqualTo: doctorId)
-          .snapshots()
-          .listen((snapshot) {
-        final remoteList = snapshot.docs
-            .map((doc) => AppointmentModel.fromMap(doc.data(), doc.id))
-            .toList();
+      subRemote = _supabase
+          .from('appointments')
+          .stream(primaryKey: ['id'])
+          .listen((data) {
+        final remoteList = data.map((map) {
+          final a = AppointmentModel.fromMap(map, map['id'] ?? '');
+          OfflineStore().appointments[a.id] = a;
+          return a;
+        }).toList();
 
         final merged = <String, AppointmentModel>{};
         for (final a in OfflineStore().getDoctorAppointments(doctorId)) {
@@ -44,7 +91,8 @@ class AppointmentService {
         final result = merged.values.toList();
         result.sort((a, b) => a.date.compareTo(b.date));
         controller.add(result);
-      }, onError: (_) {
+      }, onError: (err) {
+        debugPrint('Notice on appointments stream (using offline store): $err');
         controller.add(OfflineStore().getDoctorAppointments(doctorId));
       });
     } catch (_) {}
@@ -59,14 +107,12 @@ class AppointmentService {
 
   /// Stream appointments for a specific patient
   Stream<List<AppointmentModel>> streamPatientAppointments(String patientId) {
-    return _firestore
-        .collection('appointments')
-        .where('patientId', isEqualTo: patientId)
-        .snapshots()
-        .map((snapshot) {
-      final list = snapshot.docs
-          .map((doc) => AppointmentModel.fromMap(doc.data(), doc.id))
-          .toList();
+    return _supabase
+        .from('appointments')
+        .stream(primaryKey: ['id'])
+        .eq('patient_id', patientId)
+        .map((data) {
+      final list = data.map((map) => AppointmentModel.fromMap(map, map['id'] ?? '')).toList();
       list.sort((a, b) => a.date.compareTo(b.date));
       return list;
     });
@@ -83,16 +129,19 @@ class AppointmentService {
     String? reason,
     String? notes,
   }) async {
-    final docRef = _firestore.collection('appointments').doc();
     final now = DateTime.now();
+    final effectiveClinicId = clinicId ?? 'c0000000-0000-0000-0000-000000000001';
+    final startsAt = _combineDateAndTime(date, time);
 
+    final tempId = 'appt_${now.millisecondsSinceEpoch}';
     final appt = AppointmentModel(
-      id: docRef.id,
-      clinicId: clinicId ?? 'default-clinic',
+      id: tempId,
+      clinicId: effectiveClinicId,
       doctorId: doctorId,
       patientId: patientId,
       date: date,
       time: time,
+      startsAt: startsAt,
       type: type,
       reason: reason,
       notes: notes,
@@ -106,52 +155,25 @@ class AppointmentService {
     // Save to local store immediately (<1ms)
     OfflineStore().addAppointment(appt);
 
-    // Look up patient for contact details
-    final patient = OfflineStore().patients[patientId];
-    if (patient?.phone != null && patient!.phone!.isNotEmpty) {
-      final smsNotif = NotificationModel(
-        id: 'notif_sms_appt_${docRef.id}',
-        doctorId: doctorId,
-        patientId: patientId,
-        appointmentId: docRef.id,
-        channel: 'sms',
-        type: 'appointment_confirmation',
-        recipient: patient.phone!,
-        status: 'Sent',
-        sentAt: now,
-        createdAt: now,
-      );
-      OfflineStore().addNotification(smsNotif);
-      _firestore.collection('notifications').doc(smsNotif.id).set(smsNotif.toMap()).catchError((_) {});
+    try {
+      final insertData = {
+        'clinic_id': effectiveClinicId,
+        'doctor_id': doctorId,
+        'patient_id': patientId,
+        'starts_at': startsAt.toIso8601String(),
+        'status': 'pending',
+      };
+
+      final res = await _supabase.from('appointments').insert(insertData).select().single();
+      final realId = res['id'] ?? tempId;
+
+      final updatedAppt = AppointmentModel.fromMap(res, realId);
+      OfflineStore().addAppointment(updatedAppt);
+      return realId;
+    } catch (e) {
+      debugPrint('Notice creating appointment in Supabase: $e');
+      return tempId;
     }
-
-    if (patient?.email != null && patient!.email!.isNotEmpty) {
-      final emailNotif = NotificationModel(
-        id: 'notif_email_appt_${docRef.id}',
-        doctorId: doctorId,
-        patientId: patientId,
-        appointmentId: docRef.id,
-        channel: 'email',
-        type: 'appointment_confirmation',
-        recipient: patient.email!,
-        status: 'Sent',
-        sentAt: now,
-        createdAt: now,
-      );
-      OfflineStore().addNotification(emailNotif);
-      _firestore.collection('notifications').doc(emailNotif.id).set(emailNotif.toMap()).catchError((_) {});
-    }
-
-    _firestore.collection('appointments').doc(docRef.id).set(appt.toMap()).catchError((_) {});
-
-    // Send confirmation notifications asynchronously
-    _functions
-        .httpsCallable('sendAppointmentConfirmation')
-        .call({'appointmentId': docRef.id})
-        .then((_) {})
-        .catchError((_) {});
-
-    return docRef.id;
   }
 
   /// Update appointment status (Completed, Missed, Rescheduled, Cancelled)
@@ -160,15 +182,14 @@ class AppointmentService {
     required String status,
     String? confirmationStatus,
   }) async {
-    final Map<String, dynamic> updates = {
-      'status': status,
-      'updatedAt': DateTime.now().toIso8601String(),
-    };
-    if (confirmationStatus != null) {
-      updates['confirmationStatus'] = confirmationStatus;
+    final sqlStatus = status.toLowerCase().replaceAll(' ', '_');
+    try {
+      await _supabase.from('appointments').update({
+        'status': sqlStatus,
+      }).eq('id', appointmentId);
+    } catch (e) {
+      debugPrint('Notice updating appointment status: $e');
     }
-
-    await _firestore.collection('appointments').doc(appointmentId).update(updates);
   }
 
   /// Reschedule an appointment to a new date/time
@@ -178,34 +199,38 @@ class AppointmentService {
     required String newTime,
     String? reason,
   }) async {
-    await _firestore.collection('appointments').doc(appointmentId).update({
-      'date': newDate,
-      'time': newTime,
-      'status': 'Scheduled',
-      'confirmationStatus': 'Pending',
-      'reminder24hSent': false,
-      'reason': reason ?? 'Rescheduled',
-      'updatedAt': DateTime.now().toIso8601String(),
-    });
-
-    // Send new confirmation notification asynchronously
-    _functions
-        .httpsCallable('sendAppointmentConfirmation')
-        .call({'appointmentId': appointmentId})
-        .then((_) {})
-        .catchError((_) {});
+    final newStartsAt = _combineDateAndTime(newDate, newTime);
+    try {
+      await _supabase.from('appointments').update({
+        'starts_at': newStartsAt.toIso8601String(),
+        'status': 'pending',
+        'reminder_sent_at': null,
+        'reminder_claimed_at': null,
+        'reminder_attempts': 0,
+      }).eq('id', appointmentId);
+    } catch (e) {
+      debugPrint('Notice rescheduling appointment: $e');
+    }
   }
 
   /// Cancel an appointment
   Future<void> cancelAppointment(String appointmentId) async {
-    await _firestore.collection('appointments').doc(appointmentId).update({
-      'status': 'Cancelled',
-      'updatedAt': DateTime.now().toIso8601String(),
-    });
+    try {
+      await _supabase.from('appointments').update({
+        'status': 'cancelled',
+      }).eq('id', appointmentId);
+    } catch (e) {
+      debugPrint('Notice cancelling appointment: $e');
+    }
   }
 
   /// Permanently delete an appointment
   Future<void> deleteAppointment(String appointmentId) async {
-    await _firestore.collection('appointments').doc(appointmentId).delete();
+    OfflineStore().deleteAppointment(appointmentId);
+    try {
+      await _supabase.from('appointments').delete().eq('id', appointmentId);
+    } catch (e) {
+      debugPrint('Notice deleting appointment: $e');
+    }
   }
 }

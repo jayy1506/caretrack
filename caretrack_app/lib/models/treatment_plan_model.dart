@@ -92,23 +92,29 @@ class TreatmentPlanStageModel {
   bool get isSkipped => status == 'skipped';
 
   factory TreatmentPlanStageModel.fromMap(Map<String, dynamic> map) {
+    var rawStatus = map['status'] ?? 'upcoming';
+    if (rawStatus == 'completed') rawStatus = 'done';
     return TreatmentPlanStageModel(
-      order: map['order'] ?? 1,
+      order: map['stage_order'] ?? map['order'] ?? 1,
       name: map['name'] ?? '',
-      intervalDaysFromPrevious: map['intervalDaysFromPrevious'] ?? 0,
-      appointmentId: map['appointmentId'],
-      status: map['status'] ?? 'upcoming',
+      intervalDaysFromPrevious:
+          map['interval_days_from_previous'] ?? map['intervalDaysFromPrevious'] ?? 0,
+      appointmentId: map['appointment_id'] ?? map['appointmentId'],
+      status: rawStatus,
       notes: map['notes'],
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
+      'stage_order': order,
       'order': order,
       'name': name,
+      'interval_days_from_previous': intervalDaysFromPrevious,
       'intervalDaysFromPrevious': intervalDaysFromPrevious,
+      if (appointmentId != null) 'appointment_id': appointmentId,
       if (appointmentId != null) 'appointmentId': appointmentId,
-      'status': status,
+      'status': status == 'done' ? 'completed' : status,
       if (notes != null) 'notes': notes,
     };
   }
@@ -169,30 +175,34 @@ class TreatmentPlanModel {
       if (val is DateTime) return val;
       if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
       try {
-        return val.toDate();
+        return (val as dynamic).toDate();
       } catch (_) {
         return DateTime.now();
       }
     }
 
-    final stagesRaw = map['stages'] as List<dynamic>? ?? [];
+    final stagesRaw = (map['plan_stages'] ?? map['stages']) as List<dynamic>? ?? [];
+    final parsedStages = stagesRaw
+        .map((s) => TreatmentPlanStageModel.fromMap(Map<String, dynamic>.from(s as Map)))
+        .toList();
+    parsedStages.sort((a, b) => a.order.compareTo(b.order));
+
     return TreatmentPlanModel(
-      id: id,
-      clinicId: map['clinicId'] ?? 'default-clinic',
-      patientId: map['patientId'] ?? '',
-      doctorId: map['doctorId'] ?? '',
-      title: map['title'] ?? 'Treatment Plan',
-      templateId: map['templateId'],
+      id: map['id'] ?? id,
+      clinicId: map['clinic_id'] ?? map['clinicId'] ?? 'default-clinic',
+      patientId: map['patient_id'] ?? map['patientId'] ?? '',
+      doctorId: map['doctor_id'] ?? map['doctorId'] ?? '',
+      title: map['title'] ?? '',
+      templateId: map['template_id'] ?? map['templateId'],
       status: map['status'] ?? 'active',
-      stages: stagesRaw
-          .map((s) => TreatmentPlanStageModel.fromMap(Map<String, dynamic>.from(s)))
-          .toList(),
-      startedAt: parseDate(map['startedAt']),
-      completedAt: map['completedAt'] != null ? parseDate(map['completedAt']) : null,
-      createdAt: parseDate(map['createdAt']),
-      updatedAt: parseDate(map['updatedAt']),
+      stages: parsedStages,
+      startedAt: parseDate(map['created_at'] ?? map['startedAt']),
+      completedAt: map['completed_at'] != null ? parseDate(map['completed_at']) : null,
+      createdAt: parseDate(map['created_at'] ?? map['createdAt']),
+      updatedAt: parseDate(map['updated_at'] ?? map['updatedAt']),
     );
   }
+
 
   Map<String, dynamic> toMap() {
     return {

@@ -39,39 +39,43 @@ class UserModel {
 
   factory UserModel.fromMap(Map<String, dynamic> map, String uid) {
     DateTime? created;
-    if (map['createdAt'] != null) {
-      if (map['createdAt'] is DateTime) {
-        created = map['createdAt'];
-      } else if (map['createdAt'].toString().isNotEmpty) {
+    final rawCreated = map['created_at'] ?? map['createdAt'];
+    if (rawCreated != null) {
+      if (rawCreated is DateTime) {
+        created = rawCreated;
+      } else if (rawCreated.toString().isNotEmpty) {
         try {
-          created = DateTime.tryParse(map['createdAt'].toString());
+          created = DateTime.tryParse(rawCreated.toString());
         } catch (_) {}
       }
     }
 
     return UserModel(
-      uid: uid,
-      name: map['name'] ?? '',
+      uid: map['id'] ?? uid,
+      name: map['full_name'] ?? map['name'] ?? '',
       email: map['email'] ?? '',
       phone: map['phone'],
       role: map['role'] ?? 'doctor',
-      clinicId: map['clinicId'] ?? 'default-clinic',
+      clinicId: map['clinic_id'] ?? map['clinicId'] ?? 'default-clinic',
       active: map['active'] ?? true,
-      fcmToken: map['fcmToken'],
+      fcmToken: map['fcm_token'] ?? map['fcmToken'],
       createdAt: created,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
+      'id': uid,
       'uid': uid,
+      'full_name': name,
       'name': name,
       'email': email,
       'phone': phone,
       'role': role,
+      'clinic_id': clinicId,
       'clinicId': clinicId,
       'active': active,
-      'fcmToken': fcmToken,
+      'fcm_token': fcmToken,
     };
   }
 }
