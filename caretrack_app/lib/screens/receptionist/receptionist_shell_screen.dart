@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../services/auth_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../core/widgets/offline_banner.dart';
+import '../../core/widgets/bottom_nav_pill.dart';
 import '../../core/theme/app_theme.dart';
 import 'receptionist_home_screen.dart';
 import '../doctor/appointments/appointment_list_screen.dart';
@@ -195,44 +196,31 @@ class _ReceptionistShellScreenState extends State<ReceptionistShellScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: AppTheme.borderGrey)),
-        ),
-        child: BottomNavigationBar(
-          elevation: 0,
-          backgroundColor: Colors.white,
-          selectedItemColor: AppTheme.primaryTeal,
-          unselectedItemColor: AppTheme.slateMuted,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-          unselectedLabelStyle: const TextStyle(fontSize: 11),
-          type: BottomNavigationBarType.fixed,
-          currentIndex: _currentIndex,
-          onTap: _onTabTapped,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today_outlined),
-              activeIcon: Icon(Icons.calendar_today),
-              label: 'Front Desk',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_month_outlined),
-              activeIcon: Icon(Icons.calendar_month),
-              label: 'Visits',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.mark_chat_unread_outlined),
-              activeIcon: Icon(Icons.mark_chat_unread),
-              label: 'Inbox',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.people_outline),
-              activeIcon: Icon(Icons.people),
-              label: 'Patients',
-            ),
-          ],
-        ),
+      bottomNavigationBar: BottomNavPill(
+        currentIndex: _currentIndex,
+        onTap: _onTabTapped,
+        items: const [
+          BottomNavPillItem(
+            icon: Icons.calendar_today_outlined,
+            activeIcon: Icons.calendar_today,
+            label: 'Front Desk',
+          ),
+          BottomNavPillItem(
+            icon: Icons.calendar_month_outlined,
+            activeIcon: Icons.calendar_month,
+            label: 'Visits',
+          ),
+          BottomNavPillItem(
+            icon: Icons.mark_chat_unread_outlined,
+            activeIcon: Icons.mark_chat_unread,
+            label: 'Inbox',
+          ),
+          BottomNavPillItem(
+            icon: Icons.people_outline,
+            activeIcon: Icons.people,
+            label: 'Patients',
+          ),
+        ],
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../services/auth_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../core/widgets/offline_banner.dart';
+import '../../core/widgets/bottom_nav_pill.dart';
 import '../../core/theme/app_theme.dart';
 import 'doctor_dashboard_screen.dart';
 import 'patients/patient_list_screen.dart';
@@ -231,42 +232,36 @@ class _DoctorShellScreenState extends State<DoctorShellScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: _onTabTapped,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_outlined),
-              activeIcon: Icon(Icons.dashboard),
-              label: 'Dashboard',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.people_outline),
-              activeIcon: Icon(Icons.people),
-              label: 'Patients',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_month_outlined),
-              activeIcon: Icon(Icons.calendar_month),
-              label: 'Visits',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.outgoing_mail),
-              activeIcon: Icon(Icons.mark_email_read),
-              label: 'Comms',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Profile',
-            ),
-          ],
-        ),
+      bottomNavigationBar: BottomNavPill(
+        currentIndex: _currentIndex,
+        onTap: _onTabTapped,
+        items: const [
+          BottomNavPillItem(
+            icon: Icons.dashboard_outlined,
+            activeIcon: Icons.dashboard,
+            label: 'Dashboard',
+          ),
+          BottomNavPillItem(
+            icon: Icons.people_outline,
+            activeIcon: Icons.people,
+            label: 'Patients',
+          ),
+          BottomNavPillItem(
+            icon: Icons.calendar_month_outlined,
+            activeIcon: Icons.calendar_month,
+            label: 'Visits',
+          ),
+          BottomNavPillItem(
+            icon: Icons.outgoing_mail,
+            activeIcon: Icons.mark_email_read,
+            label: 'Comms',
+          ),
+          BottomNavPillItem(
+            icon: Icons.person_outline,
+            activeIcon: Icons.person,
+            label: 'Profile',
+          ),
+        ],
       ),
     );
   }
