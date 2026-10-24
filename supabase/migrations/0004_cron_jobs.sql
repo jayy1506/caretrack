@@ -132,13 +132,13 @@ security definer
 set search_path = public, extensions, vault
 as $$
 declare
-  current_role user_role;
+  caller_role user_role;
   result jsonb;
   request_id bigint;
   missed_count int;
 begin
-  current_role := auth_role();
-  if current_role is null or current_role not in ('owner', 'doctor') then
+  caller_role := auth_role();
+  if caller_role is null or caller_role not in ('owner', 'doctor') then
     raise exception 'Unauthorized: Only clinic owners and doctors can manually trigger background jobs';
   end if;
 
