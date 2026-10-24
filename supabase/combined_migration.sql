@@ -671,36 +671,44 @@ end;
 $$;
 
 -- 7. Schedule pg_cron recurring jobs safely
-do $$
+do $cron_setup$
 begin
   if exists (select 1 from pg_extension where extname = 'pg_cron') then
     -- Unschedule existing if any
     begin
-      perform cron.unschedule('send-notifications-hourly') where exists (select 1 from cron.job where jobname = 'send-notifications-hourly');
-      perform cron.unschedule('mark-missed-appointments-hourly') where exists (select 1 from cron.job where jobname = 'mark-missed-appointments-hourly');
-      perform cron.unschedule('medication-reminders-daily') where exists (select 1 from cron.job where jobname = 'medication-reminders-daily');
-      perform cron.unschedule('post-treatment-care-hourly') where exists (select 1 from cron.job where jobname = 'post-treatment-care-hourly');
+      if exists (select 1 from cron.job where jobname = 'send-notifications-hourly') then
+        perform cron.unschedule('send-notifications-hourly');
+      end if;
+      if exists (select 1 from cron.job where jobname = 'mark-missed-appointments-hourly') then
+        perform cron.unschedule('mark-missed-appointments-hourly');
+      end if;
+      if exists (select 1 from cron.job where jobname = 'medication-reminders-daily') then
+        perform cron.unschedule('medication-reminders-daily');
+      end if;
+      if exists (select 1 from cron.job where jobname = 'post-treatment-care-hourly') then
+        perform cron.unschedule('post-treatment-care-hourly');
+      end if;
     exception when others then
       -- Ignore cleanup errors if cron tables aren't fully initialized
     end;
 
     -- Schedule:
     -- 1) Hourly send-notifications: at :00 every hour
-    perform cron.schedule('send-notifications-hourly', '0 * * * *', $$ select trigger_edge_job('send-notifications'); $$);
+    perform cron.schedule('send-notifications-hourly', '0 * * * *', $cmd$ select trigger_edge_job('send-notifications'); $cmd$);
 
     -- 2) Hourly mark-missed-appointments: at :05 every hour
-    perform cron.schedule('mark-missed-appointments-hourly', '5 * * * *', $$ select mark_missed_appointments(); $$);
+    perform cron.schedule('mark-missed-appointments-hourly', '5 * * * *', $cmd$ select mark_missed_appointments(); $cmd$);
 
     -- 3) Daily medication reminder dispatcher: at 08:00 IST (02:30 UTC)
-    perform cron.schedule('medication-reminders-daily', '30 2 * * *', $$ select trigger_edge_job('medication-reminders', 'mode=dispatch'); $$);
+    perform cron.schedule('medication-reminders-daily', '30 2 * * *', $cmd$ select trigger_edge_job('medication-reminders', 'mode=dispatch'); $cmd$);
 
     -- 4) Hourly post-treatment care message dispatcher: at :15 every hour
-    perform cron.schedule('post-treatment-care-hourly', '15 * * * *', $$ select trigger_edge_job('post-treatment-care'); $$);
+    perform cron.schedule('post-treatment-care-hourly', '15 * * * *', $cmd$ select trigger_edge_job('post-treatment-care'); $cmd$);
   end if;
 exception when others then
   raise notice 'pg_cron job setup deferred or running in non-cron environment: %', sqlerrm;
 end;
-$$;
+$cron_setup$;
 -- CareTrack Supabase Seed Data (Demo Environment)
 -- All names, contacts, and clinical records are purely synthetic demo data.
 
