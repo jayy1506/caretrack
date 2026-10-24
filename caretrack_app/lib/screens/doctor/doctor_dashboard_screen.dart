@@ -366,6 +366,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
 
     if (isDesktop) {
       return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: tiles.map((t) => Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 5), child: t))).toList(),
       );
     }
