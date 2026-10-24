@@ -170,10 +170,7 @@ class _ReceptionistShellScreenState extends State<ReceptionistShellScreen> {
 
                   // Content Area
                   Expanded(
-                    child: IndexedStack(
-                      index: _currentIndex,
-                      children: screens,
-                    ),
+                    child: screens[_currentIndex],
                   ),
                 ],
               ),
@@ -189,10 +186,7 @@ class _ReceptionistShellScreenState extends State<ReceptionistShellScreen> {
         children: [
           OfflineBanner(isOffline: connectivity.isOffline),
           Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: screens,
-            ),
+            child: screens[_currentIndex],
           ),
         ],
       ),

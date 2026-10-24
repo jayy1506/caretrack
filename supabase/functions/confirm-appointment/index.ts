@@ -1,5 +1,4 @@
 // confirm-appointment: Public appointment confirmation and rescheduling handler
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { createServiceClient, constantTimeEquals } from "../_shared/clients.ts";
 import { checkRateLimit } from "../_shared/rate_limiter.ts";
@@ -18,7 +17,7 @@ async function hashToken(token: string): Promise<string> {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   const corsRes = handleCors(req);
   if (corsRes) return corsRes;
 

@@ -204,12 +204,9 @@ class _DoctorShellScreenState extends State<DoctorShellScreen> {
                     ),
                   ),
 
-                  // Main Content (Preserves tab state for instant 0ms switching)
+                  // Main Content
                   Expanded(
-                    child: IndexedStack(
-                      index: _currentIndex,
-                      children: screens,
-                    ),
+                    child: screens[_currentIndex],
                   ),
                 ],
               ),
@@ -219,16 +216,13 @@ class _DoctorShellScreenState extends State<DoctorShellScreen> {
       );
     }
 
-    // Mobile View (Preserves tab state for instant 0ms switching)
+    // Mobile View
     return Scaffold(
       body: Column(
         children: [
           OfflineBanner(isOffline: connectivity.isOffline),
           Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: screens,
-            ),
+            child: screens[_currentIndex],
           ),
         ],
       ),
