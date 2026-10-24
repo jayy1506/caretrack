@@ -4,12 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class SupabaseConfig {
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'http://127.0.0.1:54321',
+    defaultValue: 'https://ewsfqbihjxjotxliuztl.supabase.co',
   );
 
   static const String supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5MjB9.mockAnonKey',
+    defaultValue: 'sb_publishable_ocjPDCkEqVR3Y7DVC2lGYQ_dyZGuTvB',
   );
 
   /// Flag indicating whether image files should be stored in private bucket or processed in-memory
