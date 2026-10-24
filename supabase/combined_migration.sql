@@ -16,8 +16,13 @@ create index on patients (clinic_id, doctor_id);
 
 create function auth_clinic() returns uuid language sql stable security definer set search_path = public as $$ select clinic_id from profiles where id = auth.uid() and active $$;
 create function auth_role() returns user_role language sql stable security definer set search_path = public as $$ select role from profiles where id = auth.uid() and active $$;
-
-alter table clinics, profiles, patients, prescriptions, appointments, notifications, audit_logs enable row level security;
+alter table clinics enable row level security;
+alter table profiles enable row level security;
+alter table patients enable row level security;
+alter table prescriptions enable row level security;
+alter table appointments enable row level security;
+alter table notifications enable row level security;
+alter table audit_logs enable row level security;
 
 create policy clinic_read on clinics for select using (id = auth_clinic());
 create policy profile_read on profiles for select using (clinic_id = auth_clinic());
