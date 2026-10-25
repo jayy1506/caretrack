@@ -160,6 +160,36 @@ serve(async (req: Request) => {
           recipient_masked: maskPhone(patient.phone),
           error: err.message || "Failed to send WhatsApp message",
         });
+
+        // Multi-channel resilience: Attempt Twilio SMS fallback if WhatsApp delivery fails
+        if (Deno.env.get("TWILIO_ACCOUNT_SID")) {
+          try {
+            const smsProvider = getMessagingProvider("twilio_sms");
+            const smsResult = await smsProvider.sendTemplate(
+              patient.phone,
+              "appointment_reminder",
+              patient.language || "en",
+              {
+                clinic_name: clinic.name,
+                starts_at: appointmentTimeFormatted,
+                confirm_link: confirmUrl,
+              }
+            );
+            await service.from("notifications").insert({
+              clinic_id: clinic.id,
+              appointment_id: appt.id,
+              patient_id: patient.id,
+              channel: "sms",
+              status: "sent",
+              recipient_masked: maskPhone(patient.phone),
+              provider_message_id: smsResult.providerMessageId,
+            });
+            return { channel: "sms_fallback", success: true };
+          } catch (smsErr: any) {
+            safeError("Twilio SMS fallback failed", smsErr.message);
+          }
+        }
+
         return { channel: "whatsapp", success: false };
       }
     };

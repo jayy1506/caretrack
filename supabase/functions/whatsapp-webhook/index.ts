@@ -80,23 +80,45 @@ serve(async (req: Request) => {
       }
     }
 
-    let payload: any;
-    try {
-      payload = JSON.parse(rawBody);
-    } catch {
-      return errorResponse("Invalid JSON payload", 400);
+    let fromRaw = "";
+    let textBody = "";
+
+    // Check if incoming payload is Twilio form-urlencoded or JSON
+    if (rawBody.includes("From=") && (rawBody.includes("Body=") || rawBody.includes("MessageSid="))) {
+      const form = new URLSearchParams(rawBody);
+      fromRaw = (form.get("From") || "").replace("whatsapp:", "");
+      textBody = (form.get("Body") || "").trim();
+    } else {
+      let payload: any;
+      try {
+        payload = JSON.parse(rawBody);
+      } catch {
+        return errorResponse("Invalid webhook payload", 400);
+      }
+
+      if (payload?.From) {
+        // Twilio JSON format
+        fromRaw = (payload.From || "").replace("whatsapp:", "");
+        textBody = (payload.Body || "").trim();
+      } else {
+        // Meta WhatsApp format
+        const entry = payload?.entry?.[0]?.changes?.[0]?.value;
+        const message = entry?.messages?.[0];
+
+        // Status receipt (sent, delivered, read)
+        if (!message) {
+          return jsonResponse({ status: "acknowledged" });
+        }
+
+        fromRaw = message.from;
+        textBody = (message.text?.body || message.button?.text || "").trim();
+      }
     }
 
-    const entry = payload?.entry?.[0]?.changes?.[0]?.value;
-    const message = entry?.messages?.[0];
-
-    // Status receipt (sent, delivered, read)
-    if (!message) {
+    if (!fromRaw || !textBody) {
       return jsonResponse({ status: "acknowledged" });
     }
 
-    const fromRaw = message.from; // e.g. "919876543210"
-    const textBody = (message.text?.body || message.button?.text || "").trim();
     const normalizedSenderPhone = normalizePhone(fromRaw);
 
     const service = createServiceClient();
@@ -138,12 +160,12 @@ serve(async (req: Request) => {
         entityId: patient.id,
       });
 
-      safeLog(`Patient ${patient.id} opted out of messaging via WhatsApp`);
+      safeLog(`Patient ${patient.id} opted out of messaging via WhatsApp/SMS`);
       return jsonResponse({ status: "opted_out" });
     }
 
-    // Check for "1" / Confirm
-    if (["1", "CONFIRM", "YES", "हाँ", "हो"].includes(textUpper)) {
+    // Check for "C" / "1" / Confirm
+    if (["C", "1", "CONFIRM", "YES", "हाँ", "हो"].includes(textUpper)) {
       // Find latest pending appointment
       const { data: appt } = await service
         .from("appointments")
@@ -167,13 +189,13 @@ serve(async (req: Request) => {
           entityId: appt.id,
         });
 
-        safeLog(`Appointment ${appt.id} confirmed via WhatsApp reply`);
+        safeLog(`Appointment ${appt.id} confirmed via WhatsApp/SMS reply`);
       }
       return jsonResponse({ status: "confirmed" });
     }
 
-    // Check for "2" / Reschedule
-    if (["2", "RESCHEDULE", "बदला", "CHANGE"].includes(textUpper)) {
+    // Check for "R" / "2" / Reschedule
+    if (["R", "2", "RESCHEDULE", "बदला", "CHANGE"].includes(textUpper)) {
       const { data: appt } = await service
         .from("appointments")
         .select("id")
@@ -196,7 +218,7 @@ serve(async (req: Request) => {
           entityId: appt.id,
         });
 
-        safeLog(`Appointment ${appt.id} reschedule requested via WhatsApp reply`);
+        safeLog(`Appointment ${appt.id} reschedule requested via WhatsApp/SMS reply`);
       }
       return jsonResponse({ status: "reschedule_requested" });
     }

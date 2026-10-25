@@ -66,6 +66,28 @@ serve(async (req: Request) => {
       } catch (e: any) {
         errorMessage = e.message;
       }
+    } else if (notif.channel === "sms") {
+      if (!patient.messaging_consent) {
+        return errorResponse("Patient has opted out of messaging", 403);
+      }
+      try {
+        const messaging = getMessagingProvider("twilio_sms");
+        const res = await messaging.sendTemplate(
+          patient.phone,
+          "appointment_reminder",
+          patient.language || "en",
+          {
+            patient_name: patient.full_name,
+            starts_at: (notif.appointments as any)?.starts_at
+              ? new Date((notif.appointments as any).starts_at).toLocaleString()
+              : "Upcoming",
+          }
+        );
+        resendSuccess = true;
+        providerId = res.providerMessageId;
+      } catch (e: any) {
+        errorMessage = e.message;
+      }
     } else if (notif.channel === "email") {
       if (!patient.email) return errorResponse("Patient does not have an email address", 400);
       try {

@@ -1,4 +1,4 @@
-// Messaging Provider Abstraction for WhatsApp Cloud API, Telegram fallback, and SMS stub
+// Messaging Provider Abstraction for WhatsApp Cloud API, Twilio (WhatsApp & SMS), Telegram, and India SMS Stub
 import { safeLog, safeError } from "../logger.ts";
 
 export interface SendResult {
@@ -122,6 +122,184 @@ export class WhatsAppProvider implements MessagingProvider {
   }
 }
 
+/**
+ * Twilio WhatsApp Provider:
+ * Uses Twilio Programmable Messaging API with WhatsApp templates (Content API) or session messages.
+ */
+export class TwilioWhatsAppProvider implements MessagingProvider {
+  name = "twilio_whatsapp";
+  private accountSid: string;
+  private authToken: string;
+  private fromNumber: string;
+  private defaultContentSid: string;
+
+  constructor() {
+    this.accountSid = Deno.env.get("TWILIO_ACCOUNT_SID") || "mock-sid";
+    this.authToken = Deno.env.get("TWILIO_AUTH_TOKEN") || "mock-token";
+    this.fromNumber = Deno.env.get("TWILIO_WHATSAPP_NUMBER") || "+17372212163";
+    this.defaultContentSid = Deno.env.get("TWILIO_WHATSAPP_CONTENT_SID") || "";
+  }
+
+  async sendTemplate(
+    to: string,
+    templateName: string,
+    _language = "en",
+    variables: Record<string, string> = {}
+  ): Promise<SendResult> {
+    if (this.authToken === "mock-token" || this.accountSid === "mock-sid") {
+      safeLog(`[Mock Twilio WhatsApp] Template '${templateName}' sent to ${to}`, { variables });
+      return { providerMessageId: `mock_twilio_wa_${Date.now()}` };
+    }
+
+    const formattedTo = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
+    const formattedFrom = this.fromNumber.startsWith("whatsapp:") ? this.fromNumber : `whatsapp:${this.fromNumber}`;
+
+    const bodyParams = new URLSearchParams({
+      To: formattedTo,
+      From: formattedFrom,
+    });
+
+    // If templateName starts with HX it is a Twilio Content SID, otherwise check defaultContentSid
+    const contentSid = templateName.startsWith("HX") ? templateName : this.defaultContentSid;
+
+    if (contentSid) {
+      bodyParams.append("ContentSid", contentSid);
+      if (Object.keys(variables).length > 0) {
+        bodyParams.append("ContentVariables", JSON.stringify(variables));
+      }
+    } else {
+      const body = Object.entries(variables).length > 0
+        ? `[${templateName}] ` + Object.entries(variables).map(([k, v]) => `${k}: ${v}`).join(", ")
+        : `Notification: ${templateName}`;
+      bodyParams.append("Body", body);
+    }
+
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: "Basic " + btoa(`${this.accountSid}:${this.authToken}`),
+      },
+      body: bodyParams.toString(),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      safeError(`Twilio WhatsApp error (${res.status})`, errText);
+      throw new Error(`Twilio WhatsApp error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return { providerMessageId: data.sid || `twilio_wa_${Date.now()}` };
+  }
+
+  async sendTextMessage(to: string, text: string): Promise<SendResult> {
+    if (this.authToken === "mock-token" || this.accountSid === "mock-sid") {
+      safeLog(`[Mock Twilio WhatsApp] Text sent to ${to}: ${text.slice(0, 30)}...`);
+      return { providerMessageId: `mock_twilio_wa_${Date.now()}` };
+    }
+
+    const formattedTo = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
+    const formattedFrom = this.fromNumber.startsWith("whatsapp:") ? this.fromNumber : `whatsapp:${this.fromNumber}`;
+
+    const bodyParams = new URLSearchParams({
+      To: formattedTo,
+      From: formattedFrom,
+      Body: text,
+    });
+
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: "Basic " + btoa(`${this.accountSid}:${this.authToken}`),
+      },
+      body: bodyParams.toString(),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      safeError(`Twilio WhatsApp text error (${res.status})`, errText);
+      throw new Error(`Twilio WhatsApp text error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return { providerMessageId: data.sid || `twilio_wa_${Date.now()}` };
+  }
+}
+
+/**
+ * Twilio SMS Provider:
+ * Direct SMS delivery via Twilio Programmable SMS API.
+ */
+export class TwilioSmsProvider implements MessagingProvider {
+  name = "twilio_sms";
+  private accountSid: string;
+  private authToken: string;
+  private fromNumber: string;
+
+  constructor() {
+    this.accountSid = Deno.env.get("TWILIO_ACCOUNT_SID") || "mock-sid";
+    this.authToken = Deno.env.get("TWILIO_AUTH_TOKEN") || "mock-token";
+    this.fromNumber = Deno.env.get("TWILIO_PHONE_NUMBER") || "+17372212163";
+  }
+
+  async sendTemplate(
+    to: string,
+    templateName: string,
+    _language = "en",
+    variables: Record<string, string> = {}
+  ): Promise<SendResult> {
+    if (this.authToken === "mock-token" || this.accountSid === "mock-sid") {
+      safeLog(`[Mock Twilio SMS] Template '${templateName}' sent to ${to}`, { variables });
+      return { providerMessageId: `mock_twilio_sms_${Date.now()}` };
+    }
+
+    let body = "";
+    if (variables.clinic_name && variables.starts_at) {
+      body = `Reminder: Appt at ${variables.clinic_name} on ${variables.starts_at}. ${variables.confirm_link ? `Confirm: ${variables.confirm_link}` : ""}`.trim();
+    } else if (Object.keys(variables).length > 0) {
+      body = `[${templateName}] ` + Object.entries(variables).map(([k, v]) => `${k}: ${v}`).join(", ");
+    } else {
+      body = `Notification from CareTrack: ${templateName}`;
+    }
+
+    return this.sendTextMessage(to, body);
+  }
+
+  async sendTextMessage(to: string, text: string): Promise<SendResult> {
+    if (this.authToken === "mock-token" || this.accountSid === "mock-sid") {
+      safeLog(`[Mock Twilio SMS] Text sent to ${to}: ${text.slice(0, 30)}...`);
+      return { providerMessageId: `mock_twilio_sms_${Date.now()}` };
+    }
+
+    const cleanTo = to.startsWith("+") ? to : `+${to}`;
+    const bodyParams = new URLSearchParams({
+      To: cleanTo,
+      From: this.fromNumber,
+      Body: text,
+    });
+
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: "Basic " + btoa(`${this.accountSid}:${this.authToken}`),
+      },
+      body: bodyParams.toString(),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      safeError(`Twilio SMS error (${res.status})`, errText);
+      throw new Error(`Twilio SMS error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return { providerMessageId: data.sid || `twilio_sms_${Date.now()}` };
+  }
+}
+
 export class TelegramProvider implements MessagingProvider {
   name = "telegram";
   private botToken: string;
@@ -136,7 +314,6 @@ export class TelegramProvider implements MessagingProvider {
     _language = "en",
     variables: Record<string, string> = {}
   ): Promise<SendResult> {
-    // Format variables into standard message
     const formatted = `[${templateName}] ` + Object.entries(variables).map(([k, v]) => `${k}: ${v}`).join(", ");
     return this.sendTextMessage(to, formatted);
   }
@@ -164,9 +341,7 @@ export class TelegramProvider implements MessagingProvider {
 
 /**
  * India SMS Provider Stub:
- * TODO: For production deployment with SMS in India, telecommunication regulations mandate
- * TRAI Distributed Ledger Technology (DLT) registration. Clinics must register entity (PE ID),
- * Header (Sender ID like "SMLCAR"), and obtain approved Content Template IDs before sending SMS.
+ * TRAI Distributed Ledger Technology (DLT) reference stub.
  */
 export class IndiaSmsStubProvider implements MessagingProvider {
   name = "india_sms";
@@ -182,16 +357,28 @@ export class IndiaSmsStubProvider implements MessagingProvider {
   }
 }
 
-export function getMessagingProvider(): MessagingProvider {
-  const providerType = (Deno.env.get("MESSAGING_PROVIDER") || "whatsapp").toLowerCase();
+export function getMessagingProvider(providerOverride?: string): MessagingProvider {
+  const providerType = (providerOverride || Deno.env.get("MESSAGING_PROVIDER") || "whatsapp").toLowerCase();
   switch (providerType) {
+    case "twilio_whatsapp":
+    case "twilio":
+      return new TwilioWhatsAppProvider();
+    case "twilio_sms":
+      return new TwilioSmsProvider();
     case "telegram":
       return new TelegramProvider();
-    case "sms":
     case "india_sms":
+      return new IndiaSmsStubProvider();
+    case "sms":
+      if (Deno.env.get("TWILIO_ACCOUNT_SID")) {
+        return new TwilioSmsProvider();
+      }
       return new IndiaSmsStubProvider();
     case "whatsapp":
     default:
+      if (Deno.env.get("WHATSAPP_ACCESS_TOKEN") === "mock-access-token" && Deno.env.get("TWILIO_ACCOUNT_SID")) {
+        return new TwilioWhatsAppProvider();
+      }
       return new WhatsAppProvider();
   }
 }

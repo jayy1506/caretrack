@@ -6,7 +6,14 @@ import { constantTimeEquals } from "../functions/_shared/clients.ts";
 import { generateSlots } from "../functions/_shared/slot_generator.ts";
 import { addMonthsSafe, isLeapYear, calculateNextStageDate, isQuietHours } from "../functions/_shared/date_utils.ts";
 import { geminiExtractionResponseSchema } from "../functions/_shared/schemas.ts";
-import { MessagingProvider, SendResult } from "../functions/_shared/providers/messaging_provider.ts";
+import {
+  MessagingProvider,
+  SendResult,
+  TwilioWhatsAppProvider,
+  TwilioSmsProvider,
+  getMessagingProvider,
+} from "../functions/_shared/providers/messaging_provider.ts";
+import { sendEmail } from "../functions/_shared/providers/email_provider.ts";
 
 // ----------------------------------------------------
 // 1. Phone Normalization & Masking Tests
@@ -312,4 +319,47 @@ Deno.test("Scheduled Jobs: post-treatment care claim idempotency", () => {
   const claimedSecondRun = claimDue(appointments);
   assertEquals(claimedSecondRun.length, 0);
 });
+
+// ----------------------------------------------------
+// 8. Twilio Messaging & Email Provider Tests
+// ----------------------------------------------------
+Deno.test("Twilio Messaging: TwilioWhatsAppProvider fallback & mock routing", async () => {
+  const provider = new TwilioWhatsAppProvider();
+  assertEquals(provider.name, "twilio_whatsapp");
+  const res = await provider.sendTemplate("+918085412805", "HXfe5ab5f00277942d4d4200328b4d403c", "en", {
+    patient_name: "John Doe",
+  });
+  assert(res.providerMessageId.length > 0);
+
+  const textRes = await provider.sendTextMessage("+918085412805", "Hello from test");
+  assert(textRes.providerMessageId.length > 0);
+});
+
+Deno.test("Twilio Messaging: TwilioSmsProvider mock routing", async () => {
+  const provider = new TwilioSmsProvider();
+  assertEquals(provider.name, "twilio_sms");
+  const res = await provider.sendTemplate("+918085412805", "appointment_reminder", "en", {
+    clinic_name: "CareTrack Dental",
+    starts_at: "2026-10-26 10:00",
+  });
+  assert(res.providerMessageId.length > 0);
+});
+
+Deno.test("Twilio Messaging: getMessagingProvider selects Twilio variants", () => {
+  const wa = getMessagingProvider("twilio_whatsapp");
+  assertEquals(wa.name, "twilio_whatsapp");
+
+  const sms = getMessagingProvider("twilio_sms");
+  assertEquals(sms.name, "twilio_sms");
+});
+
+Deno.test("Twilio Email: sendEmail handles mock and parameters", async () => {
+  const res = await sendEmail({
+    toEmail: "test@example.com",
+    subject: "CareTrack Reminder",
+    htmlContent: "<p>Test</p>",
+  });
+  assert(res.messageId.length > 0);
+});
+
 

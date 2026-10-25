@@ -1,0 +1,9 @@
+{
+  "workspace": [
+    "./supabase/functions"
+  ],
+  "nodeModulesDir": "auto",
+  "compilerOptions": {
+    "lib": ["deno.ns", "deno.window", "dom", "esnext"]
+  }
+}

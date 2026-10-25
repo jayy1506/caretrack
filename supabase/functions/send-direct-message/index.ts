@@ -34,7 +34,7 @@ serve(async (req: Request) => {
       return errorResponse("Cannot send message: patient has opted out of messaging", 403);
     }
 
-    const messaging = getMessagingProvider();
+    const messaging = getMessagingProvider(input.channel === "sms" ? "twilio_sms" : undefined);
     let providerResult;
 
     if (input.isTemplate && input.templateName) {
@@ -46,32 +46,27 @@ serve(async (req: Request) => {
         input.templateVariables || {}
       );
     } else {
-      // Free-form text: verify within 24h window of last inbound message
-      const { data: conv } = await service
-        .from("conversations")
-        .select("id, last_message_at")
-        .eq("clinic_id", profile.clinic_id)
-        .eq("patient_id", patient.id)
-        .maybeSingle();
+      // Free-form text: verify 24h window only for WhatsApp
+      if (input.channel === "whatsapp") {
+        const { data: lastInbound } = await service
+          .from("messages")
+          .select("created_at")
+          .eq("clinic_id", profile.clinic_id)
+          .eq("direction", "inbound")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      const { data: lastInbound } = await service
-        .from("messages")
-        .select("created_at")
-        .eq("clinic_id", profile.clinic_id)
-        .eq("direction", "inbound")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        const hoursSinceLastInbound = lastInbound
+          ? (Date.now() - new Date(lastInbound.created_at).getTime()) / (1000 * 60 * 60)
+          : 999;
 
-      const hoursSinceLastInbound = lastInbound
-        ? (Date.now() - new Date(lastInbound.created_at).getTime()) / (1000 * 60 * 60)
-        : 999;
-
-      if (hoursSinceLastInbound > 24) {
-        return errorResponse(
-          "The 24-hour customer service window has expired. You must use an approved WhatsApp template to initiate conversation.",
-          400
-        );
+        if (hoursSinceLastInbound > 24) {
+          return errorResponse(
+            "The 24-hour customer service window has expired. You must use an approved WhatsApp template to initiate conversation.",
+            400
+          );
+        }
       }
 
       providerResult = await messaging.sendTextMessage(patient.phone, input.body);
