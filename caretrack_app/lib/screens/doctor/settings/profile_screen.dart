@@ -86,9 +86,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 side: const BorderSide(color: AppTheme.borderGrey),
               ),
               leading: const Icon(Icons.tune_rounded, color: AppTheme.primaryTeal),
-              title: const Text('Clinic Profile, Hours & Features', style: TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: const Text('Holidays, staff team, plan templates & toggles'),
-              trailing: const Icon(Icons.chevron_right),
+              title: const Text('Clinic Profile, Hours & Features', style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.slateDark)),
+              subtitle: const Text('Holidays, staff team, plan templates & toggles', style: TextStyle(color: AppTheme.slateMuted)),
+              trailing: const Icon(Icons.chevron_right, color: AppTheme.slateMuted),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -104,7 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 side: const BorderSide(color: AppTheme.borderGrey),
               ),
               leading: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF25D366)),
-              title: const Text('Clinic Messaging Engine', style: TextStyle(fontWeight: FontWeight.w600)),
+              title: const Text('Clinic Messaging Engine', style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.slateDark)),
               subtitle: const Text(
                 'Cloud Functions Gateway: WhatsApp & Gmail SMTP',
                 style: TextStyle(fontSize: 12, color: AppTheme.statusSuccess),

@@ -63,8 +63,8 @@ class _AppointmentListScreenState extends State<AppointmentListScreen> with Sing
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
-          labelColor: AppTheme.primaryNavy,
-          unselectedLabelColor: AppTheme.slateMuted,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
           indicatorColor: AppTheme.mintTeal,
           indicatorWeight: 3,
           labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),

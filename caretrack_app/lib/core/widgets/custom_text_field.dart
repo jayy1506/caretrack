@@ -40,7 +40,6 @@ class CustomTextField extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Use pure crisp white text in dark mode or when specified
     final effectiveTextColor = textColor ?? (isDark ? Colors.white : AppTheme.slateDark);
     final effectiveLabelColor = isDark ? Colors.white : AppTheme.slateDark;
     final effectiveHintColor = isDark ? Colors.white54 : AppTheme.slateMuted.withAlpha(150);

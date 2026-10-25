@@ -48,6 +48,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
             padding: const EdgeInsets.all(16),
             color: AppTheme.surfaceWhite,
             child: TextField(
+              style: const TextStyle(color: AppTheme.slateDark, fontSize: 14),
               decoration: const InputDecoration(
                 hintText: 'Search patients by name, phone, or email...',
                 prefixIcon: Icon(Icons.search, color: AppTheme.slateMuted),
