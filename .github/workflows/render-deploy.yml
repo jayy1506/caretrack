@@ -1,0 +1,77 @@
+name: Render Express CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'render_service/**'
+      - '.github/workflows/render-deploy.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'render_service/**'
+      - '.github/workflows/render-deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: render-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-verify:
+    name: Audit & Test Service
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: render_service
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: render_service/package.json
+
+      - name: Clean Install Dependencies
+        run: npm install
+
+      - name: Security Vulnerability Audit
+        run: npm audit --audit-level=high
+
+      - name: Run Automated Tests
+        run: npm test
+        env:
+          NODE_ENV: test
+
+  deploy:
+    name: Trigger Render Deploy Hook
+    needs: test-and-verify
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Webhook
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "::warning::RENDER_DEPLOY_HOOK_URL secret is not configured. Skipping deploy trigger."
+            echo "Please add RENDER_DEPLOY_HOOK_URL in GitHub Repository Settings -> Secrets and variables -> Actions."
+            exit 0
+          fi
+
+          echo "Triggering Render deployment..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$RENDER_DEPLOY_HOOK")
+          HTTP_BODY=$(echo "$RESPONSE" | sed '$d')
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "Deployment successfully triggered! HTTP $HTTP_STATUS"
+          else
+            echo "::error::Deployment trigger failed with status $HTTP_STATUS: $HTTP_BODY"
+            exit 1
+          fi

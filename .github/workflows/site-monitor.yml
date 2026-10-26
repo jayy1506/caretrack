@@ -1,0 +1,71 @@
+name: Render Site Availability Monitor
+
+on:
+  schedule:
+    # Runs at 00:00, 06:00, 12:00, 18:00 UTC (every 6 hours)
+    # Complies with Render Fair Use without abusing spin-down quotas
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  monitor-websites:
+    name: Availability Probe
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        site:
+          - name: "Website 1"
+            url_secret: "SITE_1_HEALTH_URL"
+          - name: "Website 2"
+            url_secret: "SITE_2_HEALTH_URL"
+
+    steps:
+      - name: Probe Health Endpoint
+        id: probe
+        env:
+          URL_1: ${{ secrets.SITE_1_HEALTH_URL }}
+          URL_2: ${{ secrets.SITE_2_HEALTH_URL }}
+          TARGET_SECRET: ${{ matrix.site.url_secret }}
+        run: |
+          TARGET_URL=""
+          if [ "$TARGET_SECRET" = "SITE_1_HEALTH_URL" ]; then
+            TARGET_URL="$URL_1"
+          elif [ "$TARGET_SECRET" = "SITE_2_HEALTH_URL" ]; then
+            TARGET_URL="$URL_2"
+          fi
+
+          if [ -z "$TARGET_URL" ]; then
+            echo "Skipping ${{ matrix.site.name }} (Secret $TARGET_SECRET is not set)."
+            exit 0
+          fi
+
+          echo "Pinging $TARGET_URL (allowing up to 75s for potential cold start)..."
+          RESPONSE=$(curl -s -L --max-time 75 -w "\n%{http_code}" "$TARGET_URL")
+          HTTP_BODY=$(echo "$RESPONSE" | sed '$d')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+
+          echo "Response HTTP Code: $HTTP_CODE"
+          echo "Response Body: $HTTP_BODY"
+
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "::error::${{ matrix.site.name }} is DOWN or Degraded! HTTP Status: $HTTP_CODE"
+            exit 1
+          fi
+
+          echo "Service is healthy!"
+
+      - name: Send Incident Alert on Failure
+        if: failure()
+        env:
+          ALERT_WEBHOOK: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: |
+          if [ -n "$ALERT_WEBHOOK" ]; then
+            curl -H "Content-Type: application/json" \
+                 -X POST \
+                 -d "{\"content\": \"🚨 **INCIDENT ALERT**: Health check failed for **${{ matrix.site.name }}** on Render! Immediate inspection required.\"}" \
+                 "$ALERT_WEBHOOK"
+          else
+            echo "No ALERT_WEBHOOK_URL secret set. Logging error directly in GitHub Actions."
+          fi
