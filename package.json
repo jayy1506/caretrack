@@ -1,6 +1,11 @@
 {
+  "name": "caretrack",
+  "version": "1.0.0",
+  "description": "CareTrack Service Runner for Render",
+  "scripts": {
+    "start": "node render_service/server.js"
+  },
   "dependencies": {
-    "doctor": "^0.3.0",
-    "flutter": "^0.0.5"
+    "express": "^4.21.2"
   }
 }
